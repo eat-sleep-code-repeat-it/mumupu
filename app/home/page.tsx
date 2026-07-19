@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { translate } from "@/lib/translate";
 
 export default function Home() {
   const [text, setText] = useState("");
@@ -25,17 +24,29 @@ export default function Home() {
   }, []);
 
   async function handlePreview() {
-    const generatedSvg = translate(text);
-    
-    /*
-    const response = await fetch("/api/svg");
-    const data = await response.json();
-    const generatedSvg = data.svg;
-    */
+    try {
+      const response = await fetch("/api/translate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+        },
+        body: text,
+      });
 
-    setSvg(generatedSvg);
-    setPreview(true);
-     setMode("preview");
+      if (!response.ok) {
+        throw new Error(`Request failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setSvg(data.svg);
+      setPreview(true);
+      setMode("preview");
+    } catch (error) {
+      console.error("Translation failed:", error);
+      setSvg("<div style=\"color:red; padding:16px;\">Translation failed. Check console for details.</div>");
+      setPreview(true);
+      setMode("preview");
+    }
   }
 
   function handleScript() {
