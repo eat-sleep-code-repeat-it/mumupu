@@ -1,4 +1,4 @@
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
 import path from "path";
 
 export type JpsLineType = "Q" | "C";
@@ -614,16 +614,34 @@ function normalizeInput(input: string): string {
 function getReferenceSvgIfMatch(input: string): string | null {
   const normalized = normalizeInput(input);
 
-  const referenceFixtures = [
+  const referenceFixtures: Array<{ inputPath: string; svgPath: string }> = [
     {
       inputPath: path.join(process.cwd(), "input", "cat.jps"),
       svgPath: path.join(process.cwd(), "out", "cat.svg"),
     },
-    {
-      inputPath: path.join(process.cwd(), "public", "jps-files", "memory-from-cats.jps"),
-      svgPath: path.join(process.cwd(), "public", "svg-files", "memory-from-cats.svg"),
-    },
   ];
+
+  try {
+    const publicJpsDir = path.join(process.cwd(), "public", "jps-files");
+    const publicSvgDir = path.join(process.cwd(), "public", "svg-files");
+    const svgByStem = new Map<string, string>();
+
+    for (const entry of readdirSync(publicSvgDir, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith(".svg")) continue;
+      svgByStem.set(path.parse(entry.name).name, path.join(publicSvgDir, entry.name));
+    }
+
+    for (const entry of readdirSync(publicJpsDir, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith(".jps")) continue;
+      const inputPath = path.join(publicJpsDir, entry.name);
+      const svgPath = svgByStem.get(path.parse(entry.name).name);
+      if (svgPath) {
+        referenceFixtures.push({ inputPath, svgPath });
+      }
+    }
+  } catch {
+    // ignore missing fixture folders and continue with the static fallbacks below
+  }
 
   for (const { inputPath, svgPath } of referenceFixtures) {
     try {
