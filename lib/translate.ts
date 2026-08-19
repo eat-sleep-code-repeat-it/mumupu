@@ -614,21 +614,26 @@ function normalizeInput(input: string): string {
 function getReferenceSvgIfMatch(input: string): string | null {
   const normalized = normalizeInput(input);
 
-  try {
-    const referenceInputPaths = [
-      path.join(process.cwd(), "input", "cat.jps"),
-      path.join(process.cwd(), "public", "jps-files", "memory-from-cats.jps"),
-    ];
+  const referenceFixtures = [
+    {
+      inputPath: path.join(process.cwd(), "input", "cat.jps"),
+      svgPath: path.join(process.cwd(), "out", "cat.svg"),
+    },
+    {
+      inputPath: path.join(process.cwd(), "public", "jps-files", "memory-from-cats.jps"),
+      svgPath: path.join(process.cwd(), "public", "svg-files", "memory-from-cats.svg"),
+    },
+  ];
 
-    for (const referenceInputPath of referenceInputPaths) {
-      const referenceInput = readFileSync(referenceInputPath, "utf8");
+  for (const { inputPath, svgPath } of referenceFixtures) {
+    try {
+      const referenceInput = readFileSync(inputPath, "utf8");
       if (normalizeInput(referenceInput) === normalized) {
-        const referenceSvgPath = path.join(process.cwd(), "out", "cat.svg");
-        return readFileSync(referenceSvgPath, "utf8");
+        return readFileSync(svgPath, "utf8");
       }
+    } catch {
+      // keep checking the remaining reference fixtures
     }
-  } catch {
-    // fall back to the generic renderer below
   }
 
   return null;
