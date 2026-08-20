@@ -8,6 +8,7 @@ export default function Zhipu() {
   const [selectedSong, setSelectedSong] = useState("");
   const [svg, setSvg] = useState("");
   const [adjustment, setAdjustment] = useState("0");
+  const [transposeError, setTransposeError] = useState("");
   const [mode, setMode] = useState<"script" | "preview" | "zhipuPreview">("script");
   const [loadingMode, setLoadingMode] = useState<"preview" | "zhipuPreview" | null>(null);
   const [isTransposing, setIsTransposing] = useState(false);
@@ -131,10 +132,11 @@ export default function Zhipu() {
 
     const numericAdjustment = Number(adjustment);
     if (!Number.isInteger(numericAdjustment)) {
-      console.error("Transpose requires an integer adjustment value.");
+      setTransposeError("Please enter an integer transpose value, for example -1 or 1.");
       return;
     }
 
+    setTransposeError("");
     setIsTransposing(true);
     try {
       const response = await fetch("/api/transpose", {
@@ -149,14 +151,21 @@ export default function Zhipu() {
       });
 
       if (!response.ok) {
-        throw new Error(`Request failed: ${response.status}`);
+        const errorData = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(errorData?.error ?? `Request failed: ${response.status}`);
       }
 
       const data = (await response.json()) as { script: string };
       setText(data.script);
       setMode("script");
+      setTransposeError("");
     } catch (error) {
       console.error("Transpose failed:", error);
+      setTransposeError(
+        error instanceof Error
+          ? error.message
+          : "Transpose failed. Please try again.",
+      );
     } finally {
       setIsTransposing(false);
     }
@@ -176,6 +185,12 @@ export default function Zhipu() {
   const isLoadingPreview = loadingMode === "preview";
   const isLoadingZhipuPreview = loadingMode === "zhipuPreview";
   const isAnyLoading = loadingMode !== null || isTransposing;
+  const isValidAdjustment = adjustment.trim() !== "" && Number.isInteger(Number(adjustment));
+  const isTransposeDisabled = isAnyLoading || !isValidAdjustment;
+  const adjustmentValidationMessage = adjustment.trim() !== "" && !isValidAdjustment
+    ? "Please enter an integer transpose value, for example -1 or 1."
+    : "";
+  const transposeFeedback = transposeError || adjustmentValidationMessage;
 
   return (
     <main className="flex h-screen flex-col">
@@ -187,7 +202,17 @@ export default function Zhipu() {
           <input
             type="number"
             value={adjustment}
-            onChange={(e) => setAdjustment(e.target.value)}
+            onChange={(e) => {
+              setAdjustment(e.target.value);
+              if (transposeError) {
+                setTransposeError("");
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !isTransposeDisabled) {
+                void handleTranspose();
+              }
+            }}
             className="w-20 rounded border border-gray-300 px-2 py-1"
           />
         </label>
@@ -195,8 +220,8 @@ export default function Zhipu() {
           onClick={() => {
             void handleTranspose();
           }}
-          disabled={isAnyLoading}
-          className={`rounded px-3 py-1 ${isAnyLoading ? "cursor-not-allowed bg-gray-200 text-black opacity-60" : "bg-gray-200 text-black hover:bg-gray-300"}`}>
+          disabled={isTransposeDisabled}
+          className={`rounded px-3 py-1 ${isTransposeDisabled ? "cursor-not-allowed bg-gray-200 text-black opacity-60" : "bg-gray-200 text-black hover:bg-gray-300"}`}>
           {isTransposing ? "Transposing..." : "Transpose"}
         </button>
         <button
@@ -223,6 +248,9 @@ export default function Zhipu() {
         </button>
         <button className="rounded px-3 py-1 hover:bg-gray-200">Export</button>
       </nav>
+      {transposeFeedback && (
+        <div className="px-4 pt-2 text-sm text-red-600">{transposeFeedback}</div>
+      )}
 
       {/* Editor */}
       <div className="min-h-0 flex-1 p-4">

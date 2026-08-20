@@ -38,4 +38,43 @@ pnpm parity:translate memory-from-cats.jps
 
 This command is for parity checking only. The app preview and save flows render locally through `translate()`.
 
+## Transpose workflow
+
+You can transpose Zhipu/JPS note scripts by semitone adjustment either from CLI or from the zhipu page.
+
+### CLI usage
+
+```bash
+# Print transposed result to stdout
+pnpm transpose -- -a -1 -i public/songs/Londonderry.jps
+
+# Save transposed result to file
+pnpm transpose -- -a 1 -i public/songs/Londonderry.jps -o out.jps
+```
+
+### API usage
+
+`POST /api/transpose`
+
+Request body:
+
+```json
+{
+	"script": "...jps content...",
+	"adjustment": -1
+}
+```
+
+Response body:
+
+```json
+{
+	"script": "...transposed jps content..."
+}
+```
+
+### zhipu page usage
+
+Open `/zhipu`, input a transpose number such as `-1` or `1`, then click `Transpose` to replace the current script with the transposed result.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
