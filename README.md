@@ -28,4 +28,14 @@ pnpm verify:translate
 
 This command fails when a public JPS file is missing a same-stem SVG fixture, when the expected SVG title does not match the JPS title, or when `translate()` does not reproduce the expected SVG exactly.
 
+## External parity check
+
+To compare the local translator with the external Jianpu renderer for a specific public JPS file without using that renderer at runtime:
+
+```bash
+pnpm parity:translate memory-from-cats.jps
+```
+
+This command is for parity checking only. The app preview and save flows render locally through `translate()`.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

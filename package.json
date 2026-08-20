@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "verify:translate": "node --experimental-strip-types scripts/verify-translate.mjs"
+    "verify:translate": "node --experimental-strip-types scripts/verify-translate.mjs",
+    "parity:translate": "node --experimental-strip-types scripts/check-jianpu-parity.mjs"
   },
   "dependencies": {
     "next": "16.2.10",

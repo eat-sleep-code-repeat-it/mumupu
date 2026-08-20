@@ -12,10 +12,10 @@ The UI posted edited scripts to the local `/api/translate` path, which falls bac
 
 ## Fix
 
-Preview and Save now send the current script to `/api/jianpu`, which uses the richer Jianpu rendering service and only falls back when that service fails.
+Preview and Save now send the current script to the local `/api/translate` path. The local translator was upgraded to emit the richer fixture-style SVG dialect in-process, and the external Jianpu renderer is no longer used by the app at runtime.
 
 ## Verification
 
 - Focused ESLint passed for `app/home/page.tsx`.
 - `next build` completed successfully.
-- A direct remote-render check for an edited `memory-from-cats.jps` returned a valid SVG response.
+- The runtime rendering path is fully local again.

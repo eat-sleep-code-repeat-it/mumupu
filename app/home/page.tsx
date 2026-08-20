@@ -9,7 +9,7 @@ export default function Home() {
   const [mode, setMode] = useState<"script" | "preview">("script");
 
   async function renderSvg(script: string): Promise<string> {
-    const response = await fetch("/api/jianpu", {
+    const response = await fetch("/api/translate", {
       method: "POST",
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
