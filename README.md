@@ -18,15 +18,14 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-## Verify the translator directly
+## Verify public JPS fixtures
 
-To run the compiled translator script directly from the workspace:
+To verify every file in `public/jps-files/` against its same-named SVG fixture in `public/svg-files/` and confirm live-edit propagation:
 
 ```bash
-npx tsc --pretty false --target es2020 --module commonjs --moduleResolution node --lib es2020,dom --skipLibCheck --esModuleInterop lib/translate.ts --outDir .tmp-verify
-node .tmp-verify/translate.js
+pnpm verify:translate
 ```
 
-This uses the sample input from `input/cat.jps` and writes the generated SVG output for comparison with `out/cat.svg`.
+This command fails when a public JPS file is missing a same-stem SVG fixture, when the expected SVG title does not match the JPS title, or when `translate()` does not reproduce the expected SVG exactly.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

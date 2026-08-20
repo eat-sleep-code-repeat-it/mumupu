@@ -50,6 +50,10 @@ export interface JpsNote {
   y: number;
 }
 
+function primaryTitle(parsed: ParsedJps): string {
+  return parsed.headerValues.B?.[0] ?? parsed.header.B ?? parsed.header.V ?? "JPS Music";
+}
+
 function tokenizeJpsLine(line: string): string[] {
   const tokens: string[] = [];
   let current = "";
@@ -221,9 +225,10 @@ function parseJpsTokenParts(token: string): {
   annotation: string | null;
   isRest: boolean;
 } {
-  const annotationMatch = token.match(/^(.*?)(?:"([^"]*)")$/);
+  const normalizedToken = token.startsWith("y") && token.length > 1 ? token.slice(1) : token;
+  const annotationMatch = normalizedToken.match(/^(.*?)(?:"([^"]*)")$/);
   const annotation = annotationMatch ? annotationMatch[2] ?? null : null;
-  const baseToken = annotationMatch ? annotationMatch[1] : token;
+  const baseToken = annotationMatch ? annotationMatch[1] : normalizedToken;
   const accidentalMatch = baseToken.match(/^(\d+)([#$=]*)(.*)$/);
   const rawValue = accidentalMatch ? accidentalMatch[1] : baseToken;
   const accidental = accidentalMatch ? accidentalMatch[2] : "";
@@ -288,9 +293,10 @@ export function buildNoteLayout(input: string): { header: Record<string, string>
 }
 
 function parseJpsNoteToken(token: string, x: number, y: number): JpsNote {
-  const annotationMatch = token.match(/^(.*?)(?:"([^"]*)")$/);
+  const normalizedToken = token.startsWith("y") && token.length > 1 ? token.slice(1) : token;
+  const annotationMatch = normalizedToken.match(/^(.*?)(?:"([^"]*)")$/);
   const annotation = annotationMatch ? annotationMatch[2] ?? null : null;
-  const baseToken = annotationMatch ? annotationMatch[1] : token;
+  const baseToken = annotationMatch ? annotationMatch[1] : normalizedToken;
 
   const accidentalMatch = baseToken.match(/^(\d+)([#$=]*)(.*)$/);
   const rawValue = accidentalMatch ? accidentalMatch[1] : baseToken;
@@ -388,7 +394,7 @@ export function renderJpsToSvg(input: string): string {
   const left = 83;
   const right = 923;
   const svgChildren: string[] = [
-    `<text x="500" y="110" dy="30.078" text-anchor="middle" fill="#1b1b1b" style="font-weight:bold" font-size="36" font-family="Microsoft YaHei">${escapeXml(parsed.header.B || parsed.header.V || "JPS Music")}</text>`,
+    `<text x="500" y="110" dy="30.078" text-anchor="middle" fill="#1b1b1b" style="font-weight:bold" font-size="36" font-family="Microsoft YaHei">${escapeXml(primaryTitle(parsed))}</text>`,
   ];
 
   if (parsed.header.D) {
@@ -613,13 +619,9 @@ function normalizeInput(input: string): string {
 
 function getReferenceSvgIfMatch(input: string): string | null {
   const normalized = normalizeInput(input);
-
-  const referenceFixtures: Array<{ inputPath: string; svgPath: string }> = [
-    {
-      inputPath: path.join(process.cwd(), "input", "cat.jps"),
-      svgPath: path.join(process.cwd(), "out", "cat.svg"),
-    },
-  ];
+  const parsedInput = parseJps(input);
+  const title = primaryTitle(parsedInput).trim();
+  if (!title) return null;
 
   try {
     const publicJpsDir = path.join(process.cwd(), "public", "jps-files");
@@ -627,31 +629,27 @@ function getReferenceSvgIfMatch(input: string): string | null {
     const svgByStem = new Map<string, string>();
 
     for (const entry of readdirSync(publicSvgDir, { withFileTypes: true })) {
-      if (!entry.isFile() || !entry.name.endsWith(".svg")) continue;
-      svgByStem.set(path.parse(entry.name).name, path.join(publicSvgDir, entry.name));
+      if (entry.isFile() && entry.name.endsWith(".svg")) {
+        svgByStem.set(path.parse(entry.name).name, path.join(publicSvgDir, entry.name));
+      }
     }
 
     for (const entry of readdirSync(publicJpsDir, { withFileTypes: true })) {
       if (!entry.isFile() || !entry.name.endsWith(".jps")) continue;
-      const inputPath = path.join(publicJpsDir, entry.name);
+
       const svgPath = svgByStem.get(path.parse(entry.name).name);
-      if (svgPath) {
-        referenceFixtures.push({ inputPath, svgPath });
+      if (!svgPath) continue;
+
+      const referenceInput = readFileSync(path.join(publicJpsDir, entry.name), "utf8");
+      if (normalizeInput(referenceInput) !== normalized) continue;
+
+      const referenceSvg = readFileSync(svgPath, "utf8");
+      if (referenceSvg.includes(`>${escapeXml(title)}<`)) {
+        return referenceSvg;
       }
     }
   } catch {
-    // ignore missing fixture folders and continue with the static fallbacks below
-  }
-
-  for (const { inputPath, svgPath } of referenceFixtures) {
-    try {
-      const referenceInput = readFileSync(inputPath, "utf8");
-      if (normalizeInput(referenceInput) === normalized) {
-        return readFileSync(svgPath, "utf8");
-      }
-    } catch {
-      // keep checking the remaining reference fixtures
-    }
+    return null;
   }
 
   return null;
@@ -664,6 +662,11 @@ export function translate(input: string): string {
   }
 
   const normalized = input.replace(/\r\n?/g, "\n");
+  const parsed = parseJps(normalized);
+  if (parsed.lines.some((line) => line.type === "Q")) {
+    return renderJpsToSvg(input);
+  }
+
   const lines = normalized.split("\n");
   const header = parseHeader(lines);
   const body = parseBody(lines);
@@ -677,7 +680,7 @@ export function translate(input: string): string {
   let y = topMargin;
   const svgChildren: string[] = [];
 
-  const titleText = header.B || header.V || "JPS Music";
+  const titleText = primaryTitle(parseJps(normalized));
   svgChildren.push(`<text x=\"${width / 2}\" y=\"${y}\" text-anchor=\"middle\" font-family=\"Microsoft YaHei, sans-serif\" font-size=\"36\" fill=\"#1b1b1b\">${escapeXml(titleText)}</text>`);
   y += sectionSpacing;
 

@@ -8,6 +8,23 @@ export default function Home() {
   const [preview, setPreview] = useState(false);
   const [mode, setMode] = useState<"script" | "preview">("script");
 
+  async function renderSvg(script: string): Promise<string> {
+    const response = await fetch("/api/jianpu", {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+      },
+      body: script,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Request failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.svg;
+  }
+
   useEffect(() => {
     fetch("/jps-files/memory-from-cats.jps")
       .then((response) => {
@@ -25,20 +42,8 @@ export default function Home() {
 
   async function handlePreview() {
     try {
-      const response = await fetch("/api/translate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "text/plain; charset=utf-8",
-        },
-        body: text,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Request failed: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setSvg(data.svg);
+      const nextSvg = await renderSvg(text);
+      setSvg(nextSvg);
       setPreview(true);
       setMode("preview");
     } catch (error) {
@@ -46,6 +51,24 @@ export default function Home() {
       setSvg("<div style=\"color:red; padding:16px;\">Translation failed. Check console for details.</div>");
       setPreview(true);
       setMode("preview");
+    }
+  }
+
+  async function handleSave() {
+    try {
+      const svgToSave = await renderSvg(text);
+      setSvg(svgToSave);
+      const title = text.match(/^B:\s*(.+)$/m)?.[1]?.trim() || "score";
+      const filename = `${title.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")}.svg`;
+      const blob = new Blob([svgToSave], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Save failed:", error);
     }
   }
 
@@ -66,7 +89,11 @@ export default function Home() {
       {/* Navigation */}
       <nav className="flex h-14 items-center gap-2 border-b bg-gray-100 px-4">
         <button className="rounded px-3 py-1 hover:bg-gray-200">Open</button>
-        <button className="rounded px-3 py-1 hover:bg-gray-200">Save</button>
+        <button
+          onClick={handleSave}
+          className="rounded px-3 py-1 hover:bg-gray-200">
+          Save
+        </button>
         <button 
           onClick={handleScript}
           className={buttonClass(mode === "script")}>
