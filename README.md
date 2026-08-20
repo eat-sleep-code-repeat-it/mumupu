@@ -18,15 +18,15 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-## Verify public JPS fixtures
+## Verify public JPS parity
 
-To verify every file in `public/jps-files/` against its same-named SVG fixture in `public/svg-files/` and confirm live-edit propagation:
+To verify every file in `public/jps-files/` against the external Jianpu renderer oracle and confirm live-edit propagation:
 
 ```bash
 pnpm verify:translate
 ```
 
-This command fails when a public JPS file is missing a same-stem SVG fixture, when the expected SVG title does not match the JPS title, or when `translate()` does not reproduce the expected SVG exactly.
+This command fails when `translate()` does not match the external oracle output or when live edits stop propagating through the local renderer.
 
 ## External parity check
 

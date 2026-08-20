@@ -1,5 +1,12 @@
 import { DEFAULT_RICH_GLYPH_DEFS } from "./defaultRichGlyphDefs.js";
 
+const EXTRA_GLYPH_DEFS: Record<string, string> = {
+  diaohao_zimu_c:
+    '<g id="diaohao_zimu_c" transform="translate(-50,-50)"><path fill="#1b1b1b" d="m55.85,42.82703q-1.71571,-0.90955 -4.3203,-0.90955q-3.36943,0 -5.37457,2.13949t-2.00512,5.65363q0,3.76219 2.26351,6.06705t5.73631,2.30486q2.23251,0 3.70017,-0.64081l0,-2.10849q-1.67438,0.93021 -3.6795,0.93021q-2.60459,0 -4.25832,-1.73639t-1.65372,-4.69241q0,-2.81131 1.54002,-4.46502t4.02058,-1.65371q2.31519,0 4.03091,1.05424l0,-1.94311l0.00002,0.00001l0.00002,0z"/></g>',
+  diaohao_zimu_d:
+    '<g id="diaohao_zimu_d" transform="translate(-50,-50)"><path fill="black" d="m43.49999,42.00974l0,15.98051l4.54472,0q3.63578,0 6.04554,-2.11382t2.40975,-5.66505q0,-3.72033 -2.40975,-5.96098t-6.19351,-2.24066l-4.39675,0zm2.05041,14.14149l0,-12.3236l2.3252,0q3.04391,0 4.7561,1.66992t1.7122,4.65042q0,3.00163 -1.75447,4.50245t-4.60813,1.50081l-2.4309,0z"/></g>',
+};
+
 export type JpsLineType = "Q" | "C";
 
 export interface JpsLine {
@@ -28,6 +35,7 @@ export interface JpsEvent {
   octave: number;
   accidental: string;
   annotation: string | null;
+  isHiddenRest: boolean;
   measureIndex: number;
   notepos: string;
   lineIndex: number;
@@ -44,7 +52,6 @@ export interface JpsNote {
   isRest: boolean;
   isHiddenRest: boolean;
   annotation: string | null;
-    audioValue: `${rawValue}${octavePart}`,
   lyric: string | null;
   durationMark: string;
   x: number;
@@ -72,6 +79,18 @@ function tokenizeJpsLine(line: string): string[] {
   let current = "";
   let inQuotes = false;
 
+  const appendSuffixToLastNoteToken = (suffix: string): void => {
+    for (let index = tokens.length - 1; index >= 0; index -= 1) {
+      if (["|", "(", ")", "[", "]", "{", "}"].includes(tokens[index])) {
+        continue;
+      }
+      tokens[index] += suffix;
+      return;
+    }
+
+    tokens.push(suffix);
+  };
+
   for (let i = 0; i < line.length; i += 1) {
     const char = line[i];
 
@@ -98,7 +117,27 @@ function tokenizeJpsLine(line: string): string[] {
         current = "";
       }
 
+      if (char === "|" && (line[i + 1] === "/" || line[i + 1] === "*")) {
+        tokens.push(`${char}${line[i + 1]}`);
+        i += 1;
+        continue;
+      }
+
       tokens.push(char);
+
+      if (char === ")" || char === "]" || char === "}") {
+        let suffix = "";
+        let lookahead = i + 1;
+        while (lookahead < line.length && /[-/.]/.test(line[lookahead])) {
+          suffix += line[lookahead];
+          lookahead += 1;
+        }
+        if (suffix) {
+          appendSuffixToLastNoteToken(suffix);
+          i = lookahead - 1;
+        }
+      }
+
       continue;
     }
 
@@ -153,44 +192,73 @@ export function parseJpsEvents(input: string): JpsEvent[] {
   const parsed = parseJps(input);
   const events: JpsEvent[] = [];
   let measureIndex = 0;
+  let melodyLineIndex = 0;
+
+  const parseQuotedToken = (token: string): string | null => {
+    const match = token.match(/^"([^"]*)"$/);
+    return match ? match[1] : null;
+  };
 
   parsed.lines.forEach((line, lineIndex) => {
     if (line.type !== "Q") return;
 
     let eventIndex = 0;
-    for (const token of line.tokens) {
-      if (token === "|") {
-        events.push(createJpsEvent("bar", token, lineIndex, eventIndex, measureIndex));
+    for (let tokenIndex = 0; tokenIndex < line.tokens.length; tokenIndex += 1) {
+      const token = line.tokens[tokenIndex];
+      if (token === "|" || token === "|/" || token === "|*") {
+        const nextToken = line.tokens[tokenIndex + 1];
+        const isFinalDoubleBar = token === "|" && nextToken === "|" && tokenIndex + 1 === line.tokens.length - 1;
+        const annotationToken = isFinalDoubleBar ? null : parseQuotedToken(nextToken ?? "");
+        const annotation = annotationToken?.startsWith("p:") ? annotationToken : null;
+        events.push({
+          ...createJpsEvent("bar", isFinalDoubleBar ? "|j" : token, melodyLineIndex, eventIndex, measureIndex, lineIndex),
+          annotation,
+        });
         measureIndex += 1;
         eventIndex += 1;
+        if (isFinalDoubleBar) {
+          tokenIndex += 1;
+        } else if (annotation) {
+          tokenIndex += 1;
+        }
         continue;
       }
 
       if (token === "(") {
-        events.push(createJpsEvent("group-start", token, lineIndex, eventIndex, measureIndex));
+        events.push(createJpsEvent("group-start", token, melodyLineIndex, eventIndex, measureIndex, lineIndex));
         eventIndex += 1;
         continue;
       }
 
       if (token === ")") {
-        events.push(createJpsEvent("group-end", token, lineIndex, eventIndex, measureIndex));
+        events.push(createJpsEvent("group-end", token, melodyLineIndex, eventIndex, measureIndex, lineIndex));
         eventIndex += 1;
         continue;
       }
 
       if (token === "-") {
         events.push({
-          ...createJpsEvent("hold", token, lineIndex, eventIndex, measureIndex),
+          ...createJpsEvent("hold", token, melodyLineIndex, eventIndex, measureIndex, lineIndex),
           time: 1,
         });
         eventIndex += 1;
         continue;
       }
 
+      if (/^[-/.]+$/.test(token)) {
+        const previousEvent = events.at(-1);
+        if (previousEvent && previousEvent.lineIndex === lineIndex && (previousEvent.type === "note" || previousEvent.type === "hold")) {
+          previousEvent.code += token;
+          previousEvent.durationMark += token;
+          previousEvent.time = durationTime(previousEvent.durationMark);
+        }
+        continue;
+      }
+
       const parsedToken = parseJpsTokenParts(token);
       const isDynamic = parsedToken.annotation?.startsWith("p:") ?? false;
       events.push({
-        ...createJpsEvent(isDynamic ? "dynamic" : "note", token, lineIndex, eventIndex, measureIndex),
+        ...createJpsEvent(isDynamic ? "dynamic" : "note", token, melodyLineIndex, eventIndex, measureIndex, lineIndex),
         code: token,
         pitch: isDynamic || parsedToken.isRest ? null : parsedToken.rawValue,
         audio: parsedToken.isRest ? "0" : parsedToken.audioValue,
@@ -199,15 +267,18 @@ export function parseJpsEvents(input: string): JpsEvent[] {
         octave: parsedToken.octave,
         accidental: parsedToken.accidental,
         annotation: parsedToken.annotation,
+        isHiddenRest: parsedToken.rawValue === "8",
       });
       eventIndex += 1;
     }
+
+    melodyLineIndex += 1;
   });
 
   return events;
 }
 
-function createJpsEvent(type: JpsEventType, raw: string, lineIndex: number, eventIndex: number, measureIndex: number): JpsEvent {
+function createJpsEvent(type: JpsEventType, raw: string, melodyLineIndex: number, eventIndex: number, measureIndex: number, sourceLineIndex: number): JpsEvent {
   return {
     type,
     raw,
@@ -219,15 +290,56 @@ function createJpsEvent(type: JpsEventType, raw: string, lineIndex: number, even
     octave: 0,
     accidental: "",
     annotation: null,
+    isHiddenRest: false,
     measureIndex,
-    notepos: `0_${lineIndex + 1}_${eventIndex + 1}`,
-    lineIndex,
+    notepos: `0_${melodyLineIndex + 1}_${eventIndex + 1}`,
+    lineIndex: sourceLineIndex,
   };
 }
 
 function durationTime(durationMark: string): number {
-  if (durationMark.includes("/")) return durationMark.includes(".") ? 0.75 : 0.5;
-  return durationMark.includes(".") ? 1.5 : 1;
+  const slashCount = (durationMark.match(/\//g) ?? []).length;
+  const dotCount = (durationMark.match(/\./g) ?? []).length;
+  const baseDuration = 1 / Math.pow(2, slashCount);
+
+  let dottedMultiplier = 1;
+  let increment = 0.5;
+  for (let index = 0; index < dotCount; index += 1) {
+    dottedMultiplier += increment;
+    increment /= 2;
+  }
+
+  return baseDuration * dottedMultiplier;
+}
+
+function extractTokenAnnotation(token: string): { baseToken: string; annotation: string | null } {
+  const annotationMatch = token.match(/^(.*?)"([^"]*)"(.*)$/);
+  if (!annotationMatch) {
+    return { baseToken: token, annotation: null };
+  }
+
+  return {
+    baseToken: `${annotationMatch[1]}${annotationMatch[3]}`,
+    annotation: annotationMatch[2] ?? null,
+  };
+}
+
+function parsePitchTail(tail: string): { accidental: string; octavePart: string } {
+  let accidental = "";
+  let octavePart = "";
+
+  for (const char of tail) {
+    if (char === "#" || char === "$" || char === "=") {
+      accidental += char;
+      continue;
+    }
+
+    if (char === "'" || char === ",") {
+      octavePart += char;
+    }
+  }
+
+  return { accidental, octavePart };
 }
 
 function parseJpsTokenParts(token: string): {
@@ -240,22 +352,18 @@ function parseJpsTokenParts(token: string): {
   isRest: boolean;
 } {
   const normalizedToken = token.startsWith("y") && token.length > 1 ? token.slice(1) : token;
-  const annotationMatch = normalizedToken.match(/^(.*?)(?:"([^"]*)")$/);
-  const annotation = annotationMatch ? annotationMatch[2] ?? null : null;
-  const baseToken = annotationMatch ? annotationMatch[1] : normalizedToken;
-  const accidentalMatch = baseToken.match(/^(\d+)([#$=]*)(.*)$/);
+  const { baseToken, annotation } = extractTokenAnnotation(normalizedToken);
+  const accidentalMatch = baseToken.match(/^(\d+)(.*)$/);
   const rawValue = accidentalMatch ? accidentalMatch[1] : baseToken;
-  const accidental = accidentalMatch ? accidentalMatch[2] : "";
-  const restOfToken = accidentalMatch ? accidentalMatch[3] : "";
+  const restOfToken = accidentalMatch ? accidentalMatch[2] : "";
   const durationMatch = restOfToken.match(/([-/.]+)$/);
   const durationMark = durationMatch ? durationMatch[1] : "";
   const pitchSuffix = durationMatch ? restOfToken.slice(0, -durationMark.length) : restOfToken;
-  const octaveMatch = pitchSuffix.match(/([',]+)$/);
-  const octavePart = octaveMatch ? octaveMatch[1] : "";
+  const { accidental, octavePart } = parsePitchTail(pitchSuffix);
 
   return {
     rawValue,
-    audioValue: `${rawValue}${octavePart}`,
+    audioValue: `${rawValue}${pitchSuffix}`,
     accidental,
     octave: octavePart.split("'").length - octavePart.split(",").length,
     durationMark,
@@ -289,7 +397,7 @@ export function buildNoteLayout(input: string): { header: Record<string, string>
         continue;
       }
 
-      if (token === "|") {
+      if (token === "|" || token === "|*" || token === "|/") {
         measureBars.push(x - 10);
         continue;
       }
@@ -309,20 +417,16 @@ export function buildNoteLayout(input: string): { header: Record<string, string>
 
 function parseJpsNoteToken(token: string, x: number, y: number): JpsNote {
   const normalizedToken = token.startsWith("y") && token.length > 1 ? token.slice(1) : token;
-  const annotationMatch = normalizedToken.match(/^(.*?)(?:"([^"]*)")$/);
-  const annotation = annotationMatch ? annotationMatch[2] ?? null : null;
-  const baseToken = annotationMatch ? annotationMatch[1] : normalizedToken;
+  const { baseToken, annotation } = extractTokenAnnotation(normalizedToken);
 
-  const accidentalMatch = baseToken.match(/^(\d+)([#$=]*)(.*)$/);
+  const accidentalMatch = baseToken.match(/^(\d+)(.*)$/);
   const rawValue = accidentalMatch ? accidentalMatch[1] : baseToken;
-  const accidentals = accidentalMatch ? accidentalMatch[2] : "";
-  const restOfToken = accidentalMatch ? accidentalMatch[3] : "";
+  const restOfToken = accidentalMatch ? accidentalMatch[2] : "";
 
   const durationMatch = restOfToken.match(/([-/.]+)$/);
   const durationMark = durationMatch ? durationMatch[1] : "";
   const pitchSuffix = durationMatch ? restOfToken.slice(0, -durationMark.length) : restOfToken;
-  const octaveMatch = pitchSuffix.match(/^(.*?)([',]+)$/);
-  const octavePart = octaveMatch ? octaveMatch[2] : "";
+  const { accidental: accidentals, octavePart } = parsePitchTail(pitchSuffix);
 
   const isRest = rawValue === "0";
   const isHiddenRest = rawValue === "8";
@@ -331,6 +435,7 @@ function parseJpsNoteToken(token: string, x: number, y: number): JpsNote {
   return {
     raw: token,
     value: rawValue,
+    audioValue: `${rawValue}${pitchSuffix}`,
     pitch,
     accidental: accidentals,
     octave: octavePart.split("'").length - octavePart.split(",").length,
@@ -408,14 +513,16 @@ export function renderJpsToSvg(input: string): string {
   const hasTempo = Boolean(parsed.header.J?.trim());
   const rowStart = hasTempo ? 266 : 236;
   const left = 83;
-  const right = 923;
+  const right = 910.3125;
+  const barAdvance = 38.54861111111;
   const svgChildren: string[] = [
-    `<text x="500" y="110" dy="30.078" text-anchor="middle" fill="#1b1b1b" style="font-weight:bold" font-size="36" font-family="Microsoft YaHei">${escapeXml(primaryTitle(parsed))}</text>`,
+    `<text x="500" y="110" dy="30.078" text-anchor="middle" fill="#1b1b1b" style="font-weight:bold;" font-size="36" font-family="Microsoft YaHei" >${escapeXml(primaryTitle(parsed))}</text>`,
   ];
+  const trailingGlyphChildren: string[] = [];
 
   const subtitle = secondaryTitle(parsed);
   if (subtitle) {
-    svgChildren.push(`<text x="500" y="166" dy="16.71" text-anchor="middle" fill="#1b1b1b" font-size="20" font-family="Microsoft YaHei">${escapeXml(subtitle.trim())}</text>`);
+    svgChildren.push(`<text x="500" y="166" dy="16.71" text-anchor="middle" fill="#1b1b1b" font-size="20" font-family="Microsoft YaHei" >${escapeXml(subtitle.trim())}</text>`);
   }
 
   if (parsed.header.D) {
@@ -447,7 +554,7 @@ export function renderJpsToSvg(input: string): string {
   const credits = parsed.headerValues.Z ?? [];
   credits.forEach((credit, index) => {
     const creditY = (hasTempo ? 205 : 196) + index * 21;
-    svgChildren.push(`<text x="920" y="${creditY}" dy="-2.632" text-anchor="end" fill="#1b1b1b" font-size="16" font-family="Microsoft YaHei">${escapeXml(credit)}</text>`);
+    svgChildren.push(`<text x="920" y="${creditY}" dy="-2.632" text-anchor="end" fill="#1b1b1b" font-size="16" font-family="Microsoft YaHei" >${escapeXml(credit)}</text>`);
   });
 
   const scoreLines = parsed.lines.filter((line) => line.type === "Q");
@@ -456,10 +563,18 @@ export function renderJpsToSvg(input: string): string {
     const sourceLineIndex = parsed.lines.indexOf(line);
     const rowEvents = events.filter((event) => event.lineIndex === sourceLineIndex);
     const lyricLine = parsed.lines[sourceLineIndex + 1];
-    const hasLyrics = lyricLine?.type === "C";
+    const lyricValues = lyricLine?.type === "C" ? lyricUnits(lyricLine.content) : [];
+    let lyricIndex = 0;
+    const firstVisibleBarIndex = rowEvents.findIndex((event) => event.type === "bar" && event.code !== "|/");
+    const lastVisibleBarIndex = rowEvents.reduce((lastIndex, event, eventIndex) => {
+      return event.type === "bar" && event.code !== "|/" ? eventIndex : lastIndex;
+    }, -1);
     const totalTime = Math.max(1, rowEvents.reduce((sum, event) => sum + event.time, 0));
     const structuralWidth = rowEvents.reduce((sum, event) => {
-      if (event.type === "bar") return sum + 27;
+      const isLeadingBar = event === rowEvents[firstVisibleBarIndex];
+      const isClosingBar = event === rowEvents[lastVisibleBarIndex];
+      if (event.type === "bar" && event.code === "|*") return sum + barAdvance;
+      if (event.type === "bar" && event.code !== "|/" && event.code !== "|j" && !isLeadingBar && !isClosingBar) return sum + barAdvance;
       if (event.type === "dynamic") return sum + 54;
       return sum;
     }, 0);
@@ -469,10 +584,12 @@ export function renderJpsToSvg(input: string): string {
     let lastNoteX: number | null = null;
     const noteXs: number[] = [];
 
-    for (const event of rowEvents) {
+    rowEvents.forEach((event, eventIndex) => {
+      const isLeadingBar = eventIndex === firstVisibleBarIndex;
+      const isClosingBar = eventIndex === lastVisibleBarIndex;
       if (event.type === "group-start") {
         groupStarts.push(x);
-        continue;
+        return;
       }
 
       if (event.type === "group-end") {
@@ -481,91 +598,104 @@ export function renderJpsToSvg(input: string): string {
           const controlX = (groupStart + lastNoteX) / 2;
           svgChildren.push(`<path d="M ${groupStart} ${rowY - 12} Q ${controlX} ${rowY - 28} ${lastNoteX} ${rowY - 12}" fill="none" stroke="#1b1b1b" stroke-width="1" data-notepos="${event.notepos}" />`);
         }
-        continue;
+        return;
       }
 
       if (event.type === "bar") {
-        svgChildren.push(svgUse(x, rowY, "xiaojiexian", ` notepos="${event.notepos}" time="0" audio="" code="${escapeXml(event.code)}"`));
-        x += 27;
-        continue;
+        const isEndBar = event.code === "|j";
+        const isHiddenBar = event.code === "|/" || event.code === "|*";
+        const barX = isLeadingBar ? left : isEndBar || isClosingBar ? right : x;
+        if (!isHiddenBar) {
+          svgChildren.push(svgUse(barX, rowY, isEndBar ? "jieshufu" : "xiaojiexian", ` notepos="${event.notepos}" time="0" audio="" code="${escapeXml(event.code)}"`));
+        }
+        if (event.annotation?.startsWith("p:")) {
+          pushTemporaryMeter(svgChildren, barX + 11, rowY, event.annotation);
+        }
+        x += isHiddenBar ? (event.code === "|*" ? barAdvance : 0) : isEndBar || isLeadingBar || isClosingBar ? 0 : barAdvance;
+        return;
       }
 
       if (event.type === "hold") {
         svgChildren.push(svgUse(x, rowY, "yanyinfu", ` time="${event.time}" audio="" notepos="${event.notepos}" code="-"`));
       } else if (event.type === "dynamic") {
-        const dynamic = (event.annotation ?? event.code).replace(/^p:/i, "");
-        const [numerator, denominator] = dynamic.split("/");
-        const dynamicX = x + 11;
-        if (numerator && denominator) {
-          svgChildren.push(svgUse(dynamicX, rowY - 10, `linshi_paihao_shuzi_${numerator}`, ""));
-          svgChildren.push(svgUse(dynamicX, rowY, "linshi_paihao_fenxian", ""));
-          svgChildren.push(svgUse(dynamicX, rowY + 10, `linshi_paihao_shuzi_${denominator}`, ""));
-        } else {
-          svgChildren.push(`<text x="${dynamicX}" y="${rowY - 20}" text-anchor="middle" fill="#1b1b1b" font-size="12" font-family="Microsoft YaHei">${escapeXml(dynamic)}</text>`);
-        }
+        pushTemporaryMeter(svgChildren, x + 11, rowY, event.annotation ?? event.code);
         x += 54;
       } else if (event.type === "note") {
         const glyph = event.pitch === null ? (event.raw.startsWith("8") ? "shuzi_b_8" : "shuzi_b_0") : `shuzi_b_${event.pitch}`;
-        svgChildren.push(svgUse(x, rowY, glyph, ` time="${event.time}" audio="${escapeXml(event.audio ?? "")}" notepos="${event.notepos}" code="${escapeXml(event.code)}"`));
+        if (!event.isHiddenRest) {
+          svgChildren.push(svgUse(x, rowY, glyph, ` time="${event.time}" audio="${escapeXml(event.audio ?? "")}" notepos="${event.notepos}" code="${escapeXml(event.code)}"`));
+        }
         lastNoteX = x;
         noteXs.push(x);
-        if (event.accidental) {
+        if (!event.isHiddenRest && event.accidental) {
           const accidentalGlyph = event.accidental.includes("#") ? "bianyinfu_sheng" : event.accidental.includes("$") ? "bianyinfu_jiang" : "bianyinfu_huanyuan";
           svgChildren.push(svgUse(x, rowY, accidentalGlyph, ""));
         }
-        if (!hasLyrics) {
-          for (let octaveIndex = 0; octaveIndex < Math.abs(event.octave); octaveIndex += 1) {
-            const octaveGlyph = event.octave > 0 ? "yingao_gao" : "yingao_di";
-            const octaveY = event.octave > 0 ? rowY - octaveIndex * 4 : rowY + 5 + octaveIndex * 4;
-            svgChildren.push(svgUse(x, octaveY, octaveGlyph, ""));
-          }
+        for (let octaveIndex = 0; !event.isHiddenRest && octaveIndex < Math.abs(event.octave); octaveIndex += 1) {
+          const octaveGlyph = event.octave > 0 ? "yingao_gao" : "yingao_di";
+          const octaveY = event.octave > 0 ? rowY - octaveIndex * 4 : rowY + 1 + octaveIndex * 4;
+          trailingGlyphChildren.push(svgUse(x, octaveY, octaveGlyph, ""));
         }
-        if (event.durationMark.includes(".")) {
-          svgChildren.push(svgUse(x, rowY, "fudian", ""));
+        const dotCount = event.isHiddenRest ? 0 : (event.durationMark.match(/\./g) ?? []).length;
+        for (let dotIndex = 0; dotIndex < dotCount; dotIndex += 1) {
+          svgChildren.push(svgUse(x + dotIndex * 7, rowY, "fudian", ""));
         }
-        if (event.annotation) {
+        if (!event.isHiddenRest && event.annotation) {
           svgChildren.push(`<text x="${x}" y="${rowY - 20}" text-anchor="middle" fill="#1b1b1b" font-size="12" font-family="Microsoft YaHei">${escapeXml(event.annotation)}</text>`);
+        }
+
+        while (lyricIndex < lyricValues.length && lyricValues[lyricIndex] === "") {
+          lyricIndex += 1;
+        }
+
+        const lyric = lyricValues[lyricIndex];
+        if (lyric) {
+          lyricIndex += 1;
+          svgChildren.push(`<text x="${x - 9}" y="${rowY + 38}" dy="6.039" fill="#101010" font-size="18" font-family="Microsoft YaHei" cipos="0_${rowIndex + 1}_${noteXs.length}" >${escapeXml(lyric)}</text>`);
+
+          while (lyricIndex < lyricValues.length) {
+            const punctuation = lyricValues[lyricIndex];
+            if (!punctuation) {
+              lyricIndex += 1;
+              continue;
+            }
+            if (!/^[，。！？；：、】【》）》,.!?;:]$/.test(punctuation)) {
+              break;
+            }
+
+            svgChildren.push(`<text x="${x + 9}" y="${rowY + 38}" dy="6.039" fill="#101010" font-size="18" font-family="Microsoft YaHei" >${escapeXml(punctuation)}</text>`);
+            lyricIndex += 1;
+          }
         }
       }
 
       x += event.time * unit;
-    }
-    if (lyricLine?.type === "C") {
-      const lyricValues = lyricUnits(lyricLine.content);
-      let noteIndex = 0;
-      let previousNoteX: number | null = null;
-      lyricValues.forEach((lyric) => {
-        if (!lyric) {
-          return;
-        }
-
-        if (/^[，。！？；：、】【》）》,.!?;:]$/.test(lyric) && previousNoteX !== null) {
-          svgChildren.push(`<text x="${previousNoteX + 18}" y="${rowY + 38}" dy="6.039" fill="#101010" font-size="18" font-family="Microsoft YaHei">${escapeXml(lyric)}</text>`);
-          return;
-        }
-
-        const noteX = noteXs[noteIndex];
-        if (noteX === undefined) {
-          return;
-        }
-
-        previousNoteX = noteX;
-        noteIndex += 1;
-        svgChildren.push(`<text x="${noteX - 9}" y="${rowY + 38}" dy="6.039" fill="#101010" font-size="18" font-family="Microsoft YaHei" cipos="0_${rowIndex + 1}_${noteIndex}">${escapeXml(lyric)}</text>`);
-      });
-    }
+    });
 
     rowY += lyricLine?.type === "C" ? 106 : 78;
   });
+  const outputChildren = [...svgChildren, ...trailingGlyphChildren];
+  const usedGlyphIds = Array.from(new Set(Array.from(outputChildren.join("\n").matchAll(/xlink:href="#([^"]+)"/g)).map((match) => match[1])));
 
-  const usedGlyphIds = Array.from(new Set(Array.from(svgChildren.join("\n").matchAll(/xlink:href="#([^"]+)"/g)).map((match) => match[1])));
-
-  return `<svg width="${width}" height="${height}" version="1.1" viewBox="${viewBox}" encoding="UTF-8" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" height="100%" width="100%" fill="#ffffff" />${defaultGlyphDefs(usedGlyphIds)}\n${svgChildren.join("\n")}
+  return `<svg width="${width}" height="${height}" version="1.1" viewBox="${viewBox}" encoding="UTF-8" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" height="100%" width="100%" fill="#ffffff" />${defaultGlyphDefs(usedGlyphIds)}\n${outputChildren.join("\n")}
 </svg>`;
 }
 
 function svgUse(x: number, y: number, id: string, attrs: string): string {
-  return `<use x="${x}" y="${y}" xlink:href="#${id}" xmlns:xlink="http://www.w3.org/1999/xlink"${attrs} ></use>`;
+  return `<use x="${x}" y="${y}" xlink:href="#${id}"${attrs} xmlns:xlink="http://www.w3.org/1999/xlink" ></use>`;
+}
+
+function pushTemporaryMeter(svgChildren: string[], x: number, rowY: number, dynamic: string): void {
+  const value = dynamic.replace(/^p:/i, "");
+  const [numerator, denominator] = value.split("/");
+  if (numerator && denominator) {
+    svgChildren.push(svgUse(x, rowY - 10, `linshi_paihao_shuzi_${numerator}`, ""));
+    svgChildren.push(svgUse(x, rowY, "linshi_paihao_fenxian", ""));
+    svgChildren.push(svgUse(x, rowY + 10, `linshi_paihao_shuzi_${denominator}`, ""));
+    return;
+  }
+
+  svgChildren.push(`<text x="${x}" y="${rowY - 20}" text-anchor="middle" fill="#1b1b1b" font-size="12" font-family="Microsoft YaHei">${escapeXml(value)}</text>`);
 }
 
 function defaultGlyphDefs(usedGlyphIds: string[]): string {
@@ -573,7 +703,7 @@ function defaultGlyphDefs(usedGlyphIds: string[]): string {
     Array.from(DEFAULT_RICH_GLYPH_DEFS.matchAll(/<g id="([^"]+)"[\s\S]*?<\/g>/g)).map((match) => [match[1], match[0]]),
   );
   const glyphDefs = usedGlyphIds
-    .map((glyphId) => glyphDefsById.get(glyphId))
+    .map((glyphId) => glyphDefsById.get(glyphId) ?? EXTRA_GLYPH_DEFS[glyphId])
     .filter((glyphDef): glyphDef is string => Boolean(glyphDef))
     .join("");
 

@@ -89,9 +89,9 @@ Status: semantic event stream and first vector glyph renderer are implemented in
 ### Phase E: verification
 
 1. Add a deterministic script that renders `memory-from-cats.jps` to a generated SVG.
-2. Compare structural metrics against `public/svg-files/memory-from-cats.svg`: dimensions, row count, event count, bar count, glyph categories, and key y positions.
+2. Compare structural metrics against the external Jianpu renderer output: dimensions, row count, event count, bar count, glyph categories, and key y positions.
 3. Add visual review screenshots at the home-page preview size and full-page SVG size.
-4. Keep the reference file as a fixture only; do not return it directly from `translate()`.
+4. Keep the external renderer as a parity oracle only; do not return or proxy its SVG at runtime.
 
 ## Recommended next implementation slice
 
