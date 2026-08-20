@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 
 export default function Zhipu() {
   const [text, setText] = useState("");
+  const [transposedText, setTransposedText] = useState("");
   const [songFiles, setSongFiles] = useState<string[]>([]);
   const [selectedSong, setSelectedSong] = useState("");
   const [svg, setSvg] = useState("");
   const [adjustment, setAdjustment] = useState("0");
   const [transposeError, setTransposeError] = useState("");
-  const [mode, setMode] = useState<"script" | "preview" | "zhipuPreview">("script");
-  const [loadingMode, setLoadingMode] = useState<"preview" | "zhipuPreview" | null>(null);
+  const [mode, setMode] = useState<"script" | "preview" | "zhipuRender" | "zhipuTransposedView">("script");
+  const [loadingMode, setLoadingMode] = useState<"preview" | "zhipuRender" | "zhipuTransposedView" | null>(null);
   const [isTransposing, setIsTransposing] = useState(false);
 
   async function renderSvg(script: string): Promise<string> {
@@ -70,6 +71,7 @@ export default function Zhipu() {
       const content = await response.text();
       setSelectedSong(file);
       setText(content);
+      setTransposedText("");
     } catch (error) {
       console.error("Failed to load selected song:", error);
     }
@@ -94,12 +96,12 @@ export default function Zhipu() {
     }
   }
 
-  async function handleZhipuPreview() {
+  async function handleZhipuRender() {
     if (loadingMode) {
       return;
     }
 
-    setLoadingMode("zhipuPreview");
+    setLoadingMode("zhipuRender");
     try {
       const response = await fetch("/api/jianpu", {
         method: "POST",
@@ -115,11 +117,42 @@ export default function Zhipu() {
 
       const data = await response.json();
       setSvg(data.svg);
-      setMode("zhipuPreview");
+      setMode("zhipuRender");
     } catch (error) {
-      console.error("Zhipu preview failed:", error);
-      setSvg("<div style=\"color:red; padding:16px;\">Zhipu preview failed. Check console for details.</div>");
-      setMode("zhipuPreview");
+      console.error("Zhipu render failed:", error);
+      setSvg("<div style=\"color:red; padding:16px;\">Zhipu render failed. Check console for details.</div>");
+      setMode("zhipuRender");
+    } finally {
+      setLoadingMode(null);
+    }
+  }
+
+  async function handleZhipuTransposedView() {
+    if (loadingMode || !transposedText) {
+      return;
+    }
+
+    setLoadingMode("zhipuTransposedView");
+    try {
+      const response = await fetch("/api/jianpu", {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+        },
+        body: transposedText,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Request failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setSvg(data.svg);
+      setMode("zhipuTransposedView");
+    } catch (error) {
+      console.error("Zhipu transposed view failed:", error);
+      setSvg("<div style=\"color:red; padding:16px;\">Zhipu transposed view failed. Check console for details.</div>");
+      setMode("zhipuTransposedView");
     } finally {
       setLoadingMode(null);
     }
@@ -156,7 +189,7 @@ export default function Zhipu() {
       }
 
       const data = (await response.json()) as { script: string };
-      setText(data.script);
+      setTransposedText(data.script);
       setMode("script");
       setTransposeError("");
     } catch (error) {
@@ -183,7 +216,8 @@ export default function Zhipu() {
     }`;
 
   const isLoadingPreview = loadingMode === "preview";
-  const isLoadingZhipuPreview = loadingMode === "zhipuPreview";
+  const isLoadingZhipuRender = loadingMode === "zhipuRender";
+  const isLoadingZhipuTransposedView = loadingMode === "zhipuTransposedView";
   const isAnyLoading = loadingMode !== null || isTransposing;
   const isValidAdjustment = adjustment.trim() !== "" && Number.isInteger(Number(adjustment));
   const isTransposeDisabled = isAnyLoading || !isValidAdjustment;
@@ -196,34 +230,6 @@ export default function Zhipu() {
     <main className="flex h-screen flex-col">
       {/* Navigation */}
       <nav className="flex h-14 items-center gap-2 border-b bg-gray-100 px-4">
-        <button className="rounded px-3 py-1 hover:bg-gray-200">Save</button>
-        <label className="flex items-center gap-2 text-sm text-gray-700">
-          <span>Transpose</span>
-          <input
-            type="number"
-            value={adjustment}
-            onChange={(e) => {
-              setAdjustment(e.target.value);
-              if (transposeError) {
-                setTransposeError("");
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !isTransposeDisabled) {
-                void handleTranspose();
-              }
-            }}
-            className="w-20 rounded border border-gray-300 px-2 py-1"
-          />
-        </label>
-        <button
-          onClick={() => {
-            void handleTranspose();
-          }}
-          disabled={isTransposeDisabled}
-          className={`rounded px-3 py-1 ${isTransposeDisabled ? "cursor-not-allowed bg-gray-200 text-black opacity-60" : "bg-gray-200 text-black hover:bg-gray-300"}`}>
-          {isTransposing ? "Transposing..." : "Transpose"}
-        </button>
         <button
           onClick={handleScript}
           disabled={isAnyLoading}
@@ -240,13 +246,53 @@ export default function Zhipu() {
         </button>
         <button
           onClick={() => {
-            void handleZhipuPreview();
+            void handleZhipuRender();
           }}
           disabled={isAnyLoading}
-          className={`${buttonClass(mode === "zhipuPreview")} ${isAnyLoading ? "cursor-not-allowed opacity-60" : ""}`}>
-          {isLoadingZhipuPreview ? "zhipuPreviewing..." : "zhipuPreview"}
+          className={`${buttonClass(mode === "zhipuRender")} ${isAnyLoading ? "cursor-not-allowed opacity-60" : ""}`}>
+          {isLoadingZhipuRender ? "zhipuRendering..." : "zhipuRender"}
         </button>
+        <button className="rounded px-3 py-1 hover:bg-gray-200">Save</button>
         <button className="rounded px-3 py-1 hover:bg-gray-200">Export</button>
+        <div className="ml-auto flex items-center gap-2">
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <span>Semitone shift</span>
+            <input
+              type="number"
+              value={adjustment}
+              onChange={(e) => {
+                setAdjustment(e.target.value);
+                if (transposeError) {
+                  setTransposeError("");
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !isTransposeDisabled) {
+                  void handleTranspose();
+                }
+              }}
+              className="w-20 rounded border border-gray-300 px-2 py-1"
+            />
+          </label>
+          <button
+            onClick={() => {
+              void handleTranspose();
+            }}
+            disabled={isTransposeDisabled}
+            className={`rounded px-3 py-1 ${isTransposeDisabled ? "cursor-not-allowed bg-gray-200 text-black opacity-60" : "bg-gray-200 text-black hover:bg-gray-300"}`}>
+            {isTransposing ? "Transposing..." : "Transpose"}
+          </button>
+          {transposedText && (
+            <button
+              onClick={() => {
+                void handleZhipuTransposedView();
+              }}
+              disabled={isAnyLoading}
+              className={`${buttonClass(mode === "zhipuTransposedView")} ${isAnyLoading ? "cursor-not-allowed opacity-60" : ""}`}>
+              {isLoadingZhipuTransposedView ? "zhipuTransposedViewing..." : "zhipuTransposedView"}
+            </button>
+          )}
+        </div>
       </nav>
       {transposeFeedback && (
         <div className="px-4 pt-2 text-sm text-red-600">{transposeFeedback}</div>
@@ -277,12 +323,37 @@ export default function Zhipu() {
             </ul>
           </aside>
           {mode === "script" ? (
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              wrap="off"
-              className="h-full min-h-0 w-full min-w-0 resize-none rounded border border-gray-700 bg-black p-4 font-mono text-white outline-none placeholder:text-gray-500 focus:border-blue-500"
-            />
+            <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-3">
+              <div className={transposedText ? "min-h-0 flex-1" : "h-full"}>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Current script</div>
+                <textarea
+                  value={text}
+                  onChange={(e) => {
+                    setText(e.target.value);
+                    if (transposedText) {
+                      setTransposedText("");
+                    }
+                  }}
+                  wrap="off"
+                  className="h-full min-h-0 w-full min-w-0 resize-none rounded border border-gray-700 bg-black p-4 font-mono text-white outline-none placeholder:text-gray-500 focus:border-blue-500"
+                />
+              </div>
+              {transposedText && (
+                <div className="min-h-0 flex-1">
+                  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Transposed script</div>
+                  <textarea
+                    value={transposedText}
+                    readOnly
+                    wrap="off"
+                    className="h-full min-h-0 w-full min-w-0 resize-none rounded border border-blue-300 bg-blue-50 p-4 font-mono text-gray-900 outline-none"
+                  />
+                </div>
+              )}
+            </div>
+          ) : mode === "zhipuTransposedView" ? (
+            <div className="h-full min-h-0 w-full min-w-0 overflow-auto rounded border border-gray-300 bg-white p-3">
+              <div dangerouslySetInnerHTML={{ __html: svg }} />
+            </div>
           ) : (
             <div className="h-full min-h-0 w-full min-w-0 overflow-auto rounded border border-gray-300 bg-white p-3">
               <div dangerouslySetInnerHTML={{ __html: svg }} />
