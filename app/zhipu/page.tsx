@@ -7,8 +7,10 @@ export default function Zhipu() {
   const [songFiles, setSongFiles] = useState<string[]>([]);
   const [selectedSong, setSelectedSong] = useState("");
   const [svg, setSvg] = useState("");
+  const [adjustment, setAdjustment] = useState("0");
   const [mode, setMode] = useState<"script" | "preview" | "zhipuPreview">("script");
   const [loadingMode, setLoadingMode] = useState<"preview" | "zhipuPreview" | null>(null);
+  const [isTransposing, setIsTransposing] = useState(false);
 
   async function renderSvg(script: string): Promise<string> {
     const response = await fetch("/api/translate", {
@@ -122,6 +124,44 @@ export default function Zhipu() {
     }
   }
 
+  async function handleTranspose() {
+    if (loadingMode || isTransposing) {
+      return;
+    }
+
+    const numericAdjustment = Number(adjustment);
+    if (!Number.isInteger(numericAdjustment)) {
+      console.error("Transpose requires an integer adjustment value.");
+      return;
+    }
+
+    setIsTransposing(true);
+    try {
+      const response = await fetch("/api/transpose", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          script: text,
+          adjustment: numericAdjustment,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Request failed: ${response.status}`);
+      }
+
+      const data = (await response.json()) as { script: string };
+      setText(data.script);
+      setMode("script");
+    } catch (error) {
+      console.error("Transpose failed:", error);
+    } finally {
+      setIsTransposing(false);
+    }
+  }
+
   function handleScript() {
     setMode("script");
   }
@@ -135,14 +175,30 @@ export default function Zhipu() {
 
   const isLoadingPreview = loadingMode === "preview";
   const isLoadingZhipuPreview = loadingMode === "zhipuPreview";
-  const isAnyLoading = loadingMode !== null;
+  const isAnyLoading = loadingMode !== null || isTransposing;
 
   return (
     <main className="flex h-screen flex-col">
       {/* Navigation */}
       <nav className="flex h-14 items-center gap-2 border-b bg-gray-100 px-4">
-        <button className="rounded px-3 py-1 hover:bg-gray-200">Open</button>
         <button className="rounded px-3 py-1 hover:bg-gray-200">Save</button>
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <span>Transpose</span>
+          <input
+            type="number"
+            value={adjustment}
+            onChange={(e) => setAdjustment(e.target.value)}
+            className="w-20 rounded border border-gray-300 px-2 py-1"
+          />
+        </label>
+        <button
+          onClick={() => {
+            void handleTranspose();
+          }}
+          disabled={isAnyLoading}
+          className={`rounded px-3 py-1 ${isAnyLoading ? "cursor-not-allowed bg-gray-200 text-black opacity-60" : "bg-gray-200 text-black hover:bg-gray-300"}`}>
+          {isTransposing ? "Transposing..." : "Transpose"}
+        </button>
         <button
           onClick={handleScript}
           disabled={isAnyLoading}
