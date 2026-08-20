@@ -8,6 +8,7 @@ export default function Zhipu() {
   const [selectedSong, setSelectedSong] = useState("");
   const [svg, setSvg] = useState("");
   const [mode, setMode] = useState<"script" | "preview" | "zhipuPreview">("script");
+  const [loadingMode, setLoadingMode] = useState<"preview" | "zhipuPreview" | null>(null);
 
   async function renderSvg(script: string): Promise<string> {
     const response = await fetch("/api/translate", {
@@ -72,6 +73,11 @@ export default function Zhipu() {
   }
 
   async function handlePreview() {
+    if (loadingMode) {
+      return;
+    }
+
+    setLoadingMode("preview");
     try {
       const nextSvg = await renderSvg(text);
       setSvg(nextSvg);
@@ -80,10 +86,17 @@ export default function Zhipu() {
       console.error("Preview failed:", error);
       setSvg("<div style=\"color:red; padding:16px;\">Preview failed. Check console for details.</div>");
       setMode("preview");
+    } finally {
+      setLoadingMode(null);
     }
   }
 
   async function handleZhipuPreview() {
+    if (loadingMode) {
+      return;
+    }
+
+    setLoadingMode("zhipuPreview");
     try {
       const response = await fetch("/api/jianpu", {
         method: "POST",
@@ -104,6 +117,8 @@ export default function Zhipu() {
       console.error("Zhipu preview failed:", error);
       setSvg("<div style=\"color:red; padding:16px;\">Zhipu preview failed. Check console for details.</div>");
       setMode("zhipuPreview");
+    } finally {
+      setLoadingMode(null);
     }
   }
 
@@ -118,26 +133,37 @@ export default function Zhipu() {
         : "bg-gray-200 text-black hover:bg-gray-300"
     }`;
 
+  const isLoadingPreview = loadingMode === "preview";
+  const isLoadingZhipuPreview = loadingMode === "zhipuPreview";
+  const isAnyLoading = loadingMode !== null;
+
   return (
     <main className="flex h-screen flex-col">
       {/* Navigation */}
       <nav className="flex h-14 items-center gap-2 border-b bg-gray-100 px-4">
         <button className="rounded px-3 py-1 hover:bg-gray-200">Open</button>
         <button className="rounded px-3 py-1 hover:bg-gray-200">Save</button>
-        <button onClick={handleScript} className={buttonClass(mode === "script")}>Script</button>
+        <button
+          onClick={handleScript}
+          disabled={isAnyLoading}
+          className={`${buttonClass(mode === "script")} ${isAnyLoading ? "cursor-not-allowed opacity-60" : ""}`}>
+          Script
+        </button>
         <button
           onClick={() => {
             void handlePreview();
           }}
-          className={buttonClass(mode === "preview")}>
-          Preview
+          disabled={isAnyLoading}
+          className={`${buttonClass(mode === "preview")} ${isAnyLoading ? "cursor-not-allowed opacity-60" : ""}`}>
+          {isLoadingPreview ? "Previewing..." : "Preview"}
         </button>
         <button
           onClick={() => {
             void handleZhipuPreview();
           }}
-          className={buttonClass(mode === "zhipuPreview")}>
-          zhipuPreview
+          disabled={isAnyLoading}
+          className={`${buttonClass(mode === "zhipuPreview")} ${isAnyLoading ? "cursor-not-allowed opacity-60" : ""}`}>
+          {isLoadingZhipuPreview ? "zhipuPreviewing..." : "zhipuPreview"}
         </button>
         <button className="rounded px-3 py-1 hover:bg-gray-200">Export</button>
       </nav>
