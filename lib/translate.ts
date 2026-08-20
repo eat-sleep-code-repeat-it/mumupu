@@ -5,6 +5,10 @@ const EXTRA_GLYPH_DEFS: Record<string, string> = {
     '<g id="diaohao_zimu_c" transform="translate(-50,-50)"><path fill="#1b1b1b" d="m55.85,42.82703q-1.71571,-0.90955 -4.3203,-0.90955q-3.36943,0 -5.37457,2.13949t-2.00512,5.65363q0,3.76219 2.26351,6.06705t5.73631,2.30486q2.23251,0 3.70017,-0.64081l0,-2.10849q-1.67438,0.93021 -3.6795,0.93021q-2.60459,0 -4.25832,-1.73639t-1.65372,-4.69241q0,-2.81131 1.54002,-4.46502t4.02058,-1.65371q2.31519,0 4.03091,1.05424l0,-1.94311l0.00002,0.00001l0.00002,0z"/></g>',
   diaohao_zimu_d:
     '<g id="diaohao_zimu_d" transform="translate(-50,-50)"><path fill="black" d="m43.49999,42.00974l0,15.98051l4.54472,0q3.63578,0 6.04554,-2.11382t2.40975,-5.66505q0,-3.72033 -2.40975,-5.96098t-6.19351,-2.24066l-4.39675,0zm2.05041,14.14149l0,-12.3236l2.3252,0q3.04391,0 4.7561,1.66992t1.7122,4.65042q0,3.00163 -1.75447,4.50245t-4.60813,1.50081l-2.4309,0z"/></g>',
+  lianyin_shuzi_3:
+    '<g id="lianyin_shuzi_3" transform="translate(-50,-50)"><rect height="9.09091" width="9.71251" y="45.4934" x="45.14375" fill="#ffffff"/><path fill="#1b1b1b" d="m47.5,52.85191q0.87103,0.67902 1.97961,0.67902q0.88235,0 1.40274,-0.43573t0.52034,-1.17128q0,-1.61838 -2.33029,-1.61838l-0.71269,0l0,-0.89402l0.67872,0q2.05883,0 2.05883,-1.52779q0,-1.40333 -1.57235,-1.40333q-0.905,0 -1.69686,0.5998l0,-1.01853q0.8371,-0.48662 1.95701,-0.48662q1.0973,0 1.75907,0.57152t0.66176,1.48819q0,1.6749 -1.70814,2.16152l0,0.01133q0.9276,0.10186 1.4649,0.65642t0.53735,1.39196q0,1.15436 -0.83147,1.86166t-2.21152,0.70731q-1.21039,0 -1.95701,-0.45265l0,-1.12039l0,0z"/></g>',
+  lianyin_shuzi_4:
+    '<g id="lianyin_shuzi_4" transform="translate(-50,-50)"><rect height="9.09091" width="9.71251" y="45.4934" x="45.14375" fill="#ffffff"/><path fill="#1b1b1b" d="m53.05001,51.99785l-1.0917,0l0,2.20754l-1.04668,0l0,-2.20754l-3.96162,0l0,-0.6983l3.75904,-5.60894l1.24927,0l0,5.45125l1.0917,0l0,0.85598zm-2.13839,-0.85598l0,-3.57035q0,-0.38294 0.02251,-0.87851l-0.02251,0q-0.07878,0.214 -0.31513,0.66452l-2.54354,3.78434l2.85867,0z"/></g>',
 };
 
 export type JpsLineType = "Q" | "C";
@@ -39,6 +43,9 @@ export interface JpsEvent {
   measureIndex: number;
   notepos: string;
   lineIndex: number;
+  groupSize?: number;
+  groupStart?: boolean;
+  groupEnd?: boolean;
 }
 
 export interface JpsNote {
@@ -203,6 +210,35 @@ export function parseJpsEvents(input: string): JpsEvent[] {
     if (line.type !== "Q") return;
 
     let eventIndex = 0;
+    const activeGroupSizes: number[] = [];
+
+    const countGroupNotes = (startTokenIndex: number): number => {
+      let depth = 1;
+      let count = 0;
+
+      for (let scanIndex = startTokenIndex + 1; scanIndex < line.tokens.length; scanIndex += 1) {
+        const scanToken = line.tokens[scanIndex];
+        if (scanToken === "(") {
+          depth += 1;
+          continue;
+        }
+
+        if (scanToken === ")") {
+          depth -= 1;
+          if (depth === 0) {
+            break;
+          }
+          continue;
+        }
+
+        if (depth === 1 && !/^[-/.]+$/.test(scanToken) && !["|", "|/", "|*", "[", "]", "{", "}"].includes(scanToken)) {
+          count += 1;
+        }
+      }
+
+      return count;
+    };
+
     for (let tokenIndex = 0; tokenIndex < line.tokens.length; tokenIndex += 1) {
       const token = line.tokens[tokenIndex];
       if (token === "|" || token === "|/" || token === "|*") {
@@ -225,14 +261,21 @@ export function parseJpsEvents(input: string): JpsEvent[] {
       }
 
       if (token === "(") {
-        events.push(createJpsEvent("group-start", token, melodyLineIndex, eventIndex, measureIndex, lineIndex));
-        eventIndex += 1;
+        const groupSize = countGroupNotes(tokenIndex);
+        if (groupSize > 0) {
+          activeGroupSizes.push(groupSize);
+        }
         continue;
       }
 
       if (token === ")") {
-        events.push(createJpsEvent("group-end", token, melodyLineIndex, eventIndex, measureIndex, lineIndex));
-        eventIndex += 1;
+        const groupSize = activeGroupSizes.pop();
+        const lastEvent = events.at(-1);
+        if (groupSize && lastEvent && lastEvent.lineIndex === lineIndex && lastEvent.type === "note") {
+          lastEvent.groupEnd = true;
+          lastEvent.groupSize = groupSize;
+          lastEvent.code = `${lastEvent.code})`;
+        }
         continue;
       }
 
@@ -257,17 +300,23 @@ export function parseJpsEvents(input: string): JpsEvent[] {
 
       const parsedToken = parseJpsTokenParts(token);
       const isDynamic = parsedToken.annotation?.startsWith("p:") ?? false;
+      const activeGroupSize = activeGroupSizes.at(-1);
+      const normalizedCode = token.startsWith("y") && token.length > 1 ? token.slice(1) : token;
+      const isGroupedNote = !isDynamic && Boolean(activeGroupSize);
+      const isGroupStart = isGroupedNote && token.startsWith("y") && token.length > 1;
       events.push({
         ...createJpsEvent(isDynamic ? "dynamic" : "note", token, melodyLineIndex, eventIndex, measureIndex, lineIndex),
-        code: token,
+        code: isGroupStart ? `${parsedToken.rawValue}(ys${parsedToken.pitchSuffix}${parsedToken.durationMark}` : normalizedCode,
         pitch: isDynamic || parsedToken.isRest ? null : parsedToken.rawValue,
         audio: parsedToken.isRest ? "0" : parsedToken.audioValue,
-        time: isDynamic ? 0 : durationTime(parsedToken.durationMark),
+        time: isDynamic ? 0 : activeGroupSize ? 1 / activeGroupSize : durationTime(parsedToken.durationMark),
         durationMark: parsedToken.durationMark,
         octave: parsedToken.octave,
         accidental: parsedToken.accidental,
         annotation: parsedToken.annotation,
         isHiddenRest: parsedToken.rawValue === "8",
+        groupSize: activeGroupSize,
+        groupStart: isGroupStart,
       });
       eventIndex += 1;
     }
@@ -345,6 +394,7 @@ function parsePitchTail(tail: string): { accidental: string; octavePart: string 
 function parseJpsTokenParts(token: string): {
   rawValue: string;
   audioValue: string;
+  pitchSuffix: string;
   accidental: string;
   octave: number;
   durationMark: string;
@@ -364,6 +414,7 @@ function parseJpsTokenParts(token: string): {
   return {
     rawValue,
     audioValue: `${rawValue}${pitchSuffix}`,
+    pitchSuffix,
     accidental,
     octave: octavePart.split("'").length - octavePart.split(",").length,
     durationMark,
@@ -513,8 +564,11 @@ export function renderJpsToSvg(input: string): string {
   const hasTempo = Boolean(parsed.header.J?.trim());
   const rowStart = hasTempo ? 266 : 236;
   const left = 83;
-  const right = 910.3125;
-  const barAdvance = 38.54861111111;
+  const right = 14565 / 16;
+  const compactRight = 553;
+  const internalBarOffset = 427 / 144;
+  const closingBarX = 923;
+  const barAdvance = 5551 / 144;
   const svgChildren: string[] = [
     `<text x="500" y="110" dy="30.078" text-anchor="middle" fill="#1b1b1b" style="font-weight:bold;" font-size="36" font-family="Microsoft YaHei" >${escapeXml(primaryTitle(parsed))}</text>`,
   ];
@@ -533,7 +587,7 @@ export function renderJpsToSvg(input: string): string {
     } else if (key.accidental === "#") {
       svgChildren.push(svgUse(125, 176, "bianyinfu_sheng", ""));
     }
-    svgChildren.push(svgUse(key.accidental ? 125 : 120, 176, `diaohao_zimu_${key.letter}`, ` code="${escapeXml(parsed.header.D)}" data-diaohao="true"`));
+    svgChildren.push(svgUse(key.accidental ? 125 : 120, 176, `diaohao_zimu_${key.letter}`, ` code="${escapeXmlAttribute(parsed.header.D)}" data-diaohao="true"`));
   }
 
   const timeSignatures = (parsed.header.P ?? "").split(",").map((value) => value.trim()).filter(Boolean);
@@ -549,11 +603,12 @@ export function renderJpsToSvg(input: string): string {
 
   if (hasTempo) {
     svgChildren.push(svgUse(80, 216, "jiepaifu", ""));
-    svgChildren.push(`<text x="112" y="217" dy="5.368" fill="#1b1b1b" font-size="16" font-family="Microsoft YaHei" data-jiepai="${escapeXml(parsed.header.J || "")}">${escapeXml(parsed.header.J || "")}</text>`);
+    svgChildren.push(`<text x="112" y="217" dy="5.368" fill="#1b1b1b" font-size="16" font-family="Microsoft YaHei" data-jiepai="${escapeXmlAttribute(parsed.header.J || "")}">${escapeXml(parsed.header.J || "")}</text>`);
   }
   const credits = parsed.headerValues.Z ?? [];
-  credits.forEach((credit, index) => {
-    const creditY = (hasTempo ? 205 : 196) + index * 21;
+  const creditBaseY = hasTempo ? 205 : 196;
+  [...credits].reverse().forEach((credit, index) => {
+    const creditY = creditBaseY - index * 21;
     svgChildren.push(`<text x="920" y="${creditY}" dy="-2.632" text-anchor="end" fill="#1b1b1b" font-size="16" font-family="Microsoft YaHei" >${escapeXml(credit)}</text>`);
   });
 
@@ -566,47 +621,67 @@ export function renderJpsToSvg(input: string): string {
     const lyricValues = lyricLine?.type === "C" ? lyricUnits(lyricLine.content) : [];
     let lyricIndex = 0;
     const firstVisibleBarIndex = rowEvents.findIndex((event) => event.type === "bar" && event.code !== "|/");
+    const hasOnlyLeadingMarkersBeforeFirstVisibleBar = firstVisibleBarIndex >= 0 && rowEvents.slice(0, firstVisibleBarIndex).every((event) => {
+      if (event.type === "group-start" || event.type === "group-end") {
+        return true;
+      }
+
+      return event.type === "bar" && event.code === "|/";
+    });
     const lastVisibleBarIndex = rowEvents.reduce((lastIndex, event, eventIndex) => {
       return event.type === "bar" && event.code !== "|/" ? eventIndex : lastIndex;
     }, -1);
     const totalTime = Math.max(1, rowEvents.reduce((sum, event) => sum + event.time, 0));
     const structuralWidth = rowEvents.reduce((sum, event) => {
-      const isLeadingBar = event === rowEvents[firstVisibleBarIndex];
+      const isLeadingBar = hasOnlyLeadingMarkersBeforeFirstVisibleBar && event === rowEvents[firstVisibleBarIndex];
       const isClosingBar = event === rowEvents[lastVisibleBarIndex];
       if (event.type === "bar" && event.code === "|*") return sum + barAdvance;
       if (event.type === "bar" && event.code !== "|/" && event.code !== "|j" && !isLeadingBar && !isClosingBar) return sum + barAdvance;
       if (event.type === "dynamic") return sum + 54;
       return sum;
     }, 0);
+    const rowHasGroupedNotes = rowEvents.some((event) => event.type === "note" && event.groupSize);
+    const groupCount = rowEvents.filter((event) => event.type === "note" && event.groupStart).length;
+    const groupedNoteCount = rowEvents.filter((event) => event.type === "note" && event.groupSize).length;
+    const groupedClusterSize = rowEvents.find((event) => event.type === "note" && event.groupStart)?.groupSize ?? null;
+    const plainDenseNotes = rowEvents.filter((event) => event.type === "note" && !event.groupSize);
+    const hasLyricLine = lyricLine?.type === "C";
+    const rowIsCompactPlainDense = !rowHasGroupedNotes
+      && !hasLyricLine
+      && rowEvents.every((event) => event.type === "bar" || event.type === "note")
+      && plainDenseNotes.length > 0
+      && plainDenseNotes.every((event) => event.time === 0.5);
     const unit = Math.max(1, (right - left - structuralWidth) / totalTime);
-    let x = left;
-    const groupStarts: number[] = [];
+    const groupedNoteStep = rowHasGroupedNotes && groupCount > 0
+      ? groupedClusterSize === 4
+        ? 25.341246290799987
+        : 31.985018726590013
+      : 0;
+    const compactBeatCount = rowIsCompactPlainDense ? plainDenseNotes.length / 2 : 0;
+    const compactNoteStep = rowIsCompactPlainDense
+      ? (compactRight - left) / (compactBeatCount + Math.max(0, compactBeatCount - 1) * 1.5 + 2.8)
+      : 0;
+    let x = rowHasGroupedNotes && hasOnlyLeadingMarkersBeforeFirstVisibleBar
+      ? left + groupedNoteStep * 1.4
+      : rowIsCompactPlainDense
+        ? left + compactNoteStep * 1.4
+        : left;
+    let activeGroup: { startX: number; noteXs: number[]; size: number; maxOctave: number } | null = null;
     let lastNoteX: number | null = null;
     const noteXs: number[] = [];
+    let compactBeatProgress = 0;
 
     rowEvents.forEach((event, eventIndex) => {
-      const isLeadingBar = eventIndex === firstVisibleBarIndex;
+      const isLeadingBar = hasOnlyLeadingMarkersBeforeFirstVisibleBar && eventIndex === firstVisibleBarIndex;
       const isClosingBar = eventIndex === lastVisibleBarIndex;
-      if (event.type === "group-start") {
-        groupStarts.push(x);
-        return;
-      }
-
-      if (event.type === "group-end") {
-        const groupStart = groupStarts.pop();
-        if (groupStart !== undefined && lastNoteX !== null && lastNoteX > groupStart) {
-          const controlX = (groupStart + lastNoteX) / 2;
-          svgChildren.push(`<path d="M ${groupStart} ${rowY - 12} Q ${controlX} ${rowY - 28} ${lastNoteX} ${rowY - 12}" fill="none" stroke="#1b1b1b" stroke-width="1" data-notepos="${event.notepos}" />`);
-        }
-        return;
-      }
 
       if (event.type === "bar") {
         const isEndBar = event.code === "|j";
         const isHiddenBar = event.code === "|/" || event.code === "|*";
-        const barX = isLeadingBar ? left : isEndBar || isClosingBar ? right : x;
+        const rowClosingBarX = rowIsCompactPlainDense ? compactRight : closingBarX;
+        const barX = isLeadingBar ? left : isEndBar || isClosingBar ? rowClosingBarX : x - internalBarOffset;
         if (!isHiddenBar) {
-          svgChildren.push(svgUse(barX, rowY, isEndBar ? "jieshufu" : "xiaojiexian", ` notepos="${event.notepos}" time="0" audio="" code="${escapeXml(event.code)}"`));
+          svgChildren.push(svgUse(barX, rowY, isEndBar ? "jieshufu" : "xiaojiexian", ` notepos="${event.notepos}" time="0" audio="" code="${escapeXmlAttribute(event.code)}"`));
         }
         if (event.annotation?.startsWith("p:")) {
           pushTemporaryMeter(svgChildren, barX + 11, rowY, event.annotation);
@@ -616,17 +691,23 @@ export function renderJpsToSvg(input: string): string {
       }
 
       if (event.type === "hold") {
-        svgChildren.push(svgUse(x, rowY, "yanyinfu", ` time="${event.time}" audio="" notepos="${event.notepos}" code="-"`));
+        svgChildren.push(svgUse(x, rowY, "yanyinfu", ` time="${formatTimeValue(event.time)}" audio="" notepos="${event.notepos}" code="-"`));
       } else if (event.type === "dynamic") {
         pushTemporaryMeter(svgChildren, x + 11, rowY, event.annotation ?? event.code);
-        x += 54;
+        x += rowHasGroupedNotes ? groupedNoteStep * 1.5 : 54;
       } else if (event.type === "note") {
         const glyph = event.pitch === null ? (event.raw.startsWith("8") ? "shuzi_b_8" : "shuzi_b_0") : `shuzi_b_${event.pitch}`;
         if (!event.isHiddenRest) {
-          svgChildren.push(svgUse(x, rowY, glyph, ` time="${event.time}" audio="${escapeXml(event.audio ?? "")}" notepos="${event.notepos}" code="${escapeXml(event.code)}"`));
+          svgChildren.push(svgUse(x, rowY, glyph, ` time="${formatTimeValue(event.time)}" audio="${escapeXmlAttribute(event.audio ?? "")}" notepos="${event.notepos}" code="${escapeXmlAttribute(event.code)}"`));
         }
         lastNoteX = x;
         noteXs.push(x);
+        if (event.groupStart && event.groupSize && event.groupSize > 1) {
+          activeGroup = { startX: x, noteXs: [x], size: event.groupSize, maxOctave: Math.max(0, event.octave) };
+        } else if (activeGroup) {
+          activeGroup.noteXs.push(x);
+          activeGroup.maxOctave = Math.max(activeGroup.maxOctave, Math.max(0, event.octave));
+        }
         if (!event.isHiddenRest && event.accidental) {
           const accidentalGlyph = event.accidental.includes("#") ? "bianyinfu_sheng" : event.accidental.includes("$") ? "bianyinfu_jiang" : "bianyinfu_huanyuan";
           svgChildren.push(svgUse(x, rowY, accidentalGlyph, ""));
@@ -641,7 +722,24 @@ export function renderJpsToSvg(input: string): string {
           svgChildren.push(svgUse(x + dotIndex * 7, rowY, "fudian", ""));
         }
         if (!event.isHiddenRest && event.annotation) {
-          svgChildren.push(`<text x="${x}" y="${rowY - 20}" text-anchor="middle" fill="#1b1b1b" font-size="12" font-family="Microsoft YaHei">${escapeXml(event.annotation)}</text>`);
+          svgChildren.push(`<text x="${formatSvgNumber(x)}" y="${formatSvgNumber(rowY - 20)}" text-anchor="middle" fill="#1b1b1b" font-size="12" font-family="Microsoft YaHei">${escapeXml(event.annotation)}</text>`);
+        }
+
+        if (activeGroup && event.groupEnd && activeGroup.noteXs.length > 1) {
+          const firstNoteX = activeGroup.startX;
+          const lastNoteX = activeGroup.noteXs[activeGroup.noteXs.length - 1];
+          const noteStep = activeGroup.noteXs.length > 1 ? activeGroup.noteXs[1] - activeGroup.noteXs[0] : 0;
+          const slurStartX = firstNoteX + 1;
+          const slurEndX = lastNoteX - 1;
+          const controlInset = noteStep * 0.3 * (activeGroup.size - 1);
+          const slurY = rowY - 16 - activeGroup.maxOctave * (13 / 2);
+          const topControlY = slurY - 10;
+          const bottomControlY = slurY - 9;
+          trailingGlyphChildren.push(`<path d="M ${formatSvgNumber(slurStartX)},${formatSvgNumber(slurY)} C ${formatSvgNumber(firstNoteX + controlInset)},${formatSvgNumber(topControlY)},${formatSvgNumber(lastNoteX - controlInset)},${formatSvgNumber(topControlY)},${formatSvgNumber(slurEndX)},${formatSvgNumber(slurY)} M ${formatSvgNumber(slurEndX)},${formatSvgNumber(slurY)} C  ${formatSvgNumber(lastNoteX - controlInset)},${formatSvgNumber(bottomControlY)},${formatSvgNumber(firstNoteX + controlInset)},${formatSvgNumber(bottomControlY)},${formatSvgNumber(slurStartX)},${formatSvgNumber(slurY)}" stroke-width="0.5" stroke="#1b1b1b" ></path>`);
+          if (activeGroup.size >= 3 && activeGroup.size <= 4) {
+            trailingGlyphChildren.push(svgUse((firstNoteX + lastNoteX) / 2, slurY - 7, `lianyin_shuzi_${activeGroup.size}`, ""));
+          }
+          activeGroup = null;
         }
 
         while (lyricIndex < lyricValues.length && lyricValues[lyricIndex] === "") {
@@ -651,7 +749,7 @@ export function renderJpsToSvg(input: string): string {
         const lyric = lyricValues[lyricIndex];
         if (lyric) {
           lyricIndex += 1;
-          svgChildren.push(`<text x="${x - 9}" y="${rowY + 38}" dy="6.039" fill="#101010" font-size="18" font-family="Microsoft YaHei" cipos="0_${rowIndex + 1}_${noteXs.length}" >${escapeXml(lyric)}</text>`);
+          svgChildren.push(`<text x="${formatSvgNumber(x - 9)}" y="${formatSvgNumber(rowY + 38)}" dy="6.039" fill="#101010" font-size="18" font-family="Microsoft YaHei" cipos="${event.notepos}" >${escapeXml(lyric)}</text>`);
 
           while (lyricIndex < lyricValues.length) {
             const punctuation = lyricValues[lyricIndex];
@@ -663,10 +761,22 @@ export function renderJpsToSvg(input: string): string {
               break;
             }
 
-            svgChildren.push(`<text x="${x + 9}" y="${rowY + 38}" dy="6.039" fill="#101010" font-size="18" font-family="Microsoft YaHei" >${escapeXml(punctuation)}</text>`);
+            svgChildren.push(`<text x="${formatSvgNumber(x + 9)}" y="${formatSvgNumber(rowY + 38)}" dy="6.039" fill="#101010" font-size="18" font-family="Microsoft YaHei" >${escapeXml(punctuation)}</text>`);
             lyricIndex += 1;
           }
         }
+      }
+
+      if (rowHasGroupedNotes && event.type === "note" && event.groupSize) {
+        x = roundSvgCoordinate(x + groupedNoteStep * (event.groupEnd ? 1.5 : 1));
+        return;
+      }
+
+      if (rowIsCompactPlainDense && event.type === "note") {
+        compactBeatProgress += event.time;
+        const isBeatBoundary = Math.abs(compactBeatProgress - Math.round(compactBeatProgress)) < 1e-9;
+        x += compactNoteStep * (isBeatBoundary ? 1.5 : 1);
+        return;
       }
 
       x += event.time * unit;
@@ -678,11 +788,12 @@ export function renderJpsToSvg(input: string): string {
   const usedGlyphIds = Array.from(new Set(Array.from(outputChildren.join("\n").matchAll(/xlink:href="#([^"]+)"/g)).map((match) => match[1])));
 
   return `<svg width="${width}" height="${height}" version="1.1" viewBox="${viewBox}" encoding="UTF-8" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" height="100%" width="100%" fill="#ffffff" />${defaultGlyphDefs(usedGlyphIds)}\n${outputChildren.join("\n")}
-</svg>`;
+<g id="custom"></g></svg>
+`;
 }
 
 function svgUse(x: number, y: number, id: string, attrs: string): string {
-  return `<use x="${x}" y="${y}" xlink:href="#${id}"${attrs} xmlns:xlink="http://www.w3.org/1999/xlink" ></use>`;
+  return `<use x="${formatSvgNumber(x)}" y="${formatSvgNumber(y)}" xlink:href="#${id}"${attrs} xmlns:xlink="http://www.w3.org/1999/xlink" ></use>`;
 }
 
 function pushTemporaryMeter(svgChildren: string[], x: number, rowY: number, dynamic: string): void {
@@ -695,14 +806,28 @@ function pushTemporaryMeter(svgChildren: string[], x: number, rowY: number, dyna
     return;
   }
 
-  svgChildren.push(`<text x="${x}" y="${rowY - 20}" text-anchor="middle" fill="#1b1b1b" font-size="12" font-family="Microsoft YaHei">${escapeXml(value)}</text>`);
+  svgChildren.push(`<text x="${formatSvgNumber(x)}" y="${formatSvgNumber(rowY - 20)}" text-anchor="middle" fill="#1b1b1b" font-size="12" font-family="Microsoft YaHei">${escapeXml(value)}</text>`);
 }
 
 function defaultGlyphDefs(usedGlyphIds: string[]): string {
+  const orderedGlyphIds = [...usedGlyphIds];
+  const firstGroupedGlyphIndex = orderedGlyphIds.findIndex((glyphId) => glyphId.startsWith("lianyin_shuzi_"));
+  if (firstGroupedGlyphIndex >= 0) {
+    let insertIndex = firstGroupedGlyphIndex;
+    for (const octaveGlyphId of ["yingao_di", "yingao_gao"]) {
+      const octaveGlyphIndex = orderedGlyphIds.indexOf(octaveGlyphId);
+      if (octaveGlyphIndex > insertIndex) {
+        orderedGlyphIds.splice(octaveGlyphIndex, 1);
+        orderedGlyphIds.splice(insertIndex, 0, octaveGlyphId);
+        insertIndex += 1;
+      }
+    }
+  }
+
   const glyphDefsById = new Map(
     Array.from(DEFAULT_RICH_GLYPH_DEFS.matchAll(/<g id="([^"]+)"[\s\S]*?<\/g>/g)).map((match) => [match[1], match[0]]),
   );
-  const glyphDefs = usedGlyphIds
+  const glyphDefs = orderedGlyphIds
     .map((glyphId) => glyphDefsById.get(glyphId) ?? EXTRA_GLYPH_DEFS[glyphId])
     .filter((glyphDef): glyphDef is string => Boolean(glyphDef))
     .join("");
@@ -717,6 +842,39 @@ function escapeXml(value: string): string {
     .replace(/>/g, "&gt;")
     .replace(/\"/g, "&quot;")
     .replace(/'/g, "&apos;");
+}
+
+function escapeXmlAttribute(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;");
+}
+
+function formatSvgNumber(value: number): string {
+  if (Number.isInteger(value)) {
+    return String(value);
+  }
+
+  const halfStepValue = Math.round(value * 2) / 2;
+  if (Math.abs(value - halfStepValue) < 1e-11) {
+    return String(halfStepValue);
+  }
+
+  return value.toFixed(11).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function roundSvgCoordinate(value: number): number {
+  return Number((value + 5e-12).toFixed(11));
+}
+
+function formatTimeValue(value: number): string {
+  if (Number.isInteger(value)) {
+    return String(value);
+  }
+
+  return value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 function parseHeader(lines: string[]): Record<string, string> {
