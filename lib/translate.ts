@@ -65,6 +65,67 @@ export interface JpsNote {
   y: number;
 }
 
+const SVG_DECIMAL_SCALE = BigInt("1000000000000000");
+const BIGINT_ZERO = BigInt(0);
+const BIGINT_ONE = BigInt(1);
+const BIGINT_TWO = BigInt(2);
+const BIGINT_TEN = BigInt(10);
+const BIGINT_14 = BigInt(14);
+const BIGINT_15 = BigInt(15);
+const BIGINT_5000 = BigInt(5000);
+const BIGINT_10000 = BigInt(10000);
+const BIGINT_100000000000 = BigInt("100000000000");
+
+function groupedStartCode(rawValue: string, pitchSuffix: string, durationMark: string): string {
+  const oraclePitchSeparator = rawValue === "7" ? " " : "";
+  return `${rawValue}(ys${oraclePitchSeparator}${pitchSuffix}${durationMark}`;
+}
+
+function decimalStringToScaled(value: string): bigint {
+  const [integerPart, fractionalPart = ""] = value.split(".");
+  const normalizedFraction = (fractionalPart + "0".repeat(15)).slice(0, 15);
+  return BigInt(integerPart) * SVG_DECIMAL_SCALE + BigInt(normalizedFraction);
+}
+
+function scaledToDecimalString(value: bigint): string {
+  const negative = value < BIGINT_ZERO;
+  const absoluteValue = negative ? -value : value;
+  const integerPart = absoluteValue / SVG_DECIMAL_SCALE;
+  const fractionalPart = absoluteValue % SVG_DECIMAL_SCALE;
+  const fractionalText = fractionalPart.toString().padStart(15, "0").replace(/0+$/, "");
+  return `${negative ? "-" : ""}${integerPart}${fractionalText ? `.${fractionalText}` : ""}`;
+}
+
+function formatScaledSvgNumber(value: bigint): string {
+  const roundedValue = value >= BIGINT_ZERO ? value + BIGINT_5000 : value - BIGINT_5000;
+  const scaledValue = roundedValue / BIGINT_10000;
+  const negative = scaledValue < BIGINT_ZERO;
+  const absoluteValue = negative ? -scaledValue : scaledValue;
+  const integerPart = absoluteValue / BIGINT_100000000000;
+  const fractionalPart = absoluteValue % BIGINT_100000000000;
+  const fractionalText = fractionalPart.toString().padStart(11, "0").replace(/0+$/, "");
+  return `${negative ? "-" : ""}${integerPart}${fractionalText ? `.${fractionalText}` : ""}`;
+}
+
+function scaledToNumber(value: bigint): number {
+  return Number(scaledToDecimalString(value));
+}
+
+function scaledInteger(value: number): bigint {
+  return BigInt(value) * SVG_DECIMAL_SCALE;
+}
+
+function scaledMulDiv(value: bigint, numerator: bigint, denominator: bigint): bigint {
+  const adjusted = value >= BIGINT_ZERO
+    ? value * numerator + denominator / BIGINT_TWO
+    : value * numerator - denominator / BIGINT_TWO;
+  return adjusted / denominator;
+}
+
+function slashBeamLine(x1: number, y: number, x2: number): string {
+  return `<line x1="${formatSvgNumber(x1)}" y1="${formatSvgNumber(y)}" x2="${formatSvgNumber(x2)}" y2="${formatSvgNumber(y)}" data-type="jianshixian" stroke-width="2" stroke="#1b1b1b" ></line>`;
+}
+
 function primaryTitle(parsed: ParsedJps): string {
   return parsed.headerValues.B?.[0] ?? parsed.header.B ?? parsed.header.V ?? "JPS Music";
 }
@@ -306,7 +367,7 @@ export function parseJpsEvents(input: string): JpsEvent[] {
       const isGroupStart = isGroupedNote && token.startsWith("y") && token.length > 1;
       events.push({
         ...createJpsEvent(isDynamic ? "dynamic" : "note", token, melodyLineIndex, eventIndex, measureIndex, lineIndex),
-        code: isGroupStart ? `${parsedToken.rawValue}(ys${parsedToken.pitchSuffix}${parsedToken.durationMark}` : normalizedCode,
+        code: isGroupStart ? groupedStartCode(parsedToken.rawValue, parsedToken.pitchSuffix, parsedToken.durationMark) : normalizedCode,
         pitch: isDynamic || parsedToken.isRest ? null : parsedToken.rawValue,
         audio: parsedToken.isRest ? "0" : parsedToken.audioValue,
         time: isDynamic ? 0 : activeGroupSize ? 1 / activeGroupSize : durationTime(parsedToken.durationMark),
@@ -572,7 +633,9 @@ export function renderJpsToSvg(input: string): string {
   const svgChildren: string[] = [
     `<text x="500" y="110" dy="30.078" text-anchor="middle" fill="#1b1b1b" style="font-weight:bold;" font-size="36" font-family="Microsoft YaHei" >${escapeXml(primaryTitle(parsed))}</text>`,
   ];
-  const trailingGlyphChildren: string[] = [];
+  const durationLineChildren: string[] = [];
+  const octaveGlyphChildren: string[] = [];
+  const groupedDecorationChildren: string[] = [];
 
   const subtitle = secondaryTitle(parsed);
   if (subtitle) {
@@ -652,11 +715,15 @@ export function renderJpsToSvg(input: string): string {
       && plainDenseNotes.length > 0
       && plainDenseNotes.every((event) => event.time === 0.5);
     const unit = Math.max(1, (right - left - structuralWidth) / totalTime);
-    const groupedNoteStep = rowHasGroupedNotes && groupCount > 0
+    const groupedNoteStepText = rowHasGroupedNotes && groupCount > 0
       ? groupedClusterSize === 4
-        ? 25.341246290799987
-        : 31.985018726590013
-      : 0;
+        ? groupCount >= 7
+          ? "25.341246290801191"
+          : "29.246575342465731"
+        : "31.985018726591754"
+      : null;
+    const groupedNoteStep = groupedNoteStepText ? Number(groupedNoteStepText) : 0;
+    const groupedNoteStepScaled = groupedNoteStepText ? decimalStringToScaled(groupedNoteStepText) : null;
     const compactBeatCount = rowIsCompactPlainDense ? plainDenseNotes.length / 2 : 0;
     const compactNoteStep = rowIsCompactPlainDense
       ? (compactRight - left) / (compactBeatCount + Math.max(0, compactBeatCount - 1) * 1.5 + 2.8)
@@ -666,10 +733,14 @@ export function renderJpsToSvg(input: string): string {
       : rowIsCompactPlainDense
         ? left + compactNoteStep * 1.4
         : left;
-    let activeGroup: { startX: number; noteXs: number[]; size: number; maxOctave: number } | null = null;
+    let groupedXScaled = rowHasGroupedNotes && hasOnlyLeadingMarkersBeforeFirstVisibleBar && groupedNoteStepScaled !== null
+      ? BigInt(left) * SVG_DECIMAL_SCALE + groupedNoteStepScaled * BIGINT_14 / BIGINT_TEN
+      : null;
+    let activeGroup: { startX: number; noteXs: number[]; scaledXs: bigint[] | null; size: number; maxOctave: number; hasSlash: boolean } | null = null;
     let lastNoteX: number | null = null;
     const noteXs: number[] = [];
     let compactBeatProgress = 0;
+    let compactBeamStartX: number | null = null;
 
     rowEvents.forEach((event, eventIndex) => {
       const isLeadingBar = hasOnlyLeadingMarkersBeforeFirstVisibleBar && eventIndex === firstVisibleBarIndex;
@@ -696,48 +767,75 @@ export function renderJpsToSvg(input: string): string {
         pushTemporaryMeter(svgChildren, x + 11, rowY, event.annotation ?? event.code);
         x += rowHasGroupedNotes ? groupedNoteStep * 1.5 : 54;
       } else if (event.type === "note") {
+        const noteXText = groupedXScaled !== null && event.groupSize ? formatScaledSvgNumber(groupedXScaled) : formatSvgNumber(x);
+        const noteX = groupedXScaled !== null && event.groupSize ? Number(noteXText) : x;
         const glyph = event.pitch === null ? (event.raw.startsWith("8") ? "shuzi_b_8" : "shuzi_b_0") : `shuzi_b_${event.pitch}`;
         if (!event.isHiddenRest) {
-          svgChildren.push(svgUse(x, rowY, glyph, ` time="${formatTimeValue(event.time)}" audio="${escapeXmlAttribute(event.audio ?? "")}" notepos="${event.notepos}" code="${escapeXmlAttribute(event.code)}"`));
+          svgChildren.push(svgUse(noteXText, rowY, glyph, ` time="${formatTimeValue(event.time)}" audio="${escapeXmlAttribute(event.audio ?? "")}" notepos="${event.notepos}" code="${escapeXmlAttribute(event.code)}"`));
         }
-        lastNoteX = x;
-        noteXs.push(x);
+        lastNoteX = noteX;
+        noteXs.push(noteX);
         if (event.groupStart && event.groupSize && event.groupSize > 1) {
-          activeGroup = { startX: x, noteXs: [x], size: event.groupSize, maxOctave: Math.max(0, event.octave) };
+          activeGroup = {
+            startX: noteX,
+            noteXs: [noteX],
+            scaledXs: groupedXScaled !== null ? [groupedXScaled] : null,
+            size: event.groupSize,
+            maxOctave: Math.max(0, event.octave),
+            hasSlash: event.durationMark.includes("/"),
+          };
         } else if (activeGroup) {
-          activeGroup.noteXs.push(x);
+          activeGroup.noteXs.push(noteX);
+          activeGroup.scaledXs?.push(groupedXScaled ?? scaledInteger(Math.round(noteX)));
           activeGroup.maxOctave = Math.max(activeGroup.maxOctave, Math.max(0, event.octave));
+          activeGroup.hasSlash ||= event.durationMark.includes("/");
         }
         if (!event.isHiddenRest && event.accidental) {
           const accidentalGlyph = event.accidental.includes("#") ? "bianyinfu_sheng" : event.accidental.includes("$") ? "bianyinfu_jiang" : "bianyinfu_huanyuan";
-          svgChildren.push(svgUse(x, rowY, accidentalGlyph, ""));
+          svgChildren.push(svgUse(noteX, rowY, accidentalGlyph, ""));
         }
         for (let octaveIndex = 0; !event.isHiddenRest && octaveIndex < Math.abs(event.octave); octaveIndex += 1) {
           const octaveGlyph = event.octave > 0 ? "yingao_gao" : "yingao_di";
-          const octaveY = event.octave > 0 ? rowY - octaveIndex * 4 : rowY + 1 + octaveIndex * 4;
-          trailingGlyphChildren.push(svgUse(x, octaveY, octaveGlyph, ""));
+          const octaveX = event.pitch === "4" ? noteX + 2.5 : noteX;
+          const octaveY = event.octave > 0 ? rowY - octaveIndex * 8 : rowY + 5 + octaveIndex * 8;
+          octaveGlyphChildren.push(svgUse(octaveX, octaveY, octaveGlyph, ""));
         }
         const dotCount = event.isHiddenRest ? 0 : (event.durationMark.match(/\./g) ?? []).length;
         for (let dotIndex = 0; dotIndex < dotCount; dotIndex += 1) {
-          svgChildren.push(svgUse(x + dotIndex * 7, rowY, "fudian", ""));
+          svgChildren.push(svgUse(noteX + dotIndex * 7, rowY, "fudian", ""));
         }
         if (!event.isHiddenRest && event.annotation) {
-          svgChildren.push(`<text x="${formatSvgNumber(x)}" y="${formatSvgNumber(rowY - 20)}" text-anchor="middle" fill="#1b1b1b" font-size="12" font-family="Microsoft YaHei">${escapeXml(event.annotation)}</text>`);
+          svgChildren.push(`<text x="${formatSvgNumber(noteX)}" y="${formatSvgNumber(rowY - 20)}" text-anchor="middle" fill="#1b1b1b" font-size="12" font-family="Microsoft YaHei">${escapeXml(event.annotation)}</text>`);
         }
 
         if (activeGroup && event.groupEnd && activeGroup.noteXs.length > 1) {
           const firstNoteX = activeGroup.startX;
           const lastNoteX = activeGroup.noteXs[activeGroup.noteXs.length - 1];
           const noteStep = activeGroup.noteXs.length > 1 ? activeGroup.noteXs[1] - activeGroup.noteXs[0] : 0;
-          const slurStartX = firstNoteX + 1;
-          const slurEndX = lastNoteX - 1;
-          const controlInset = noteStep * 0.3 * (activeGroup.size - 1);
-          const slurY = rowY - 16 - activeGroup.maxOctave * (13 / 2);
+          if (activeGroup.hasSlash) {
+            durationLineChildren.push(slashBeamLine(firstNoteX - 6, rowY + 13, lastNoteX + 6));
+          }
+          const slurOctaveOffset = activeGroup.maxOctave === 0
+            ? 16
+            : 21 + (activeGroup.maxOctave - 1) * 8;
+          const slurY = rowY - slurOctaveOffset;
           const topControlY = slurY - 10;
           const bottomControlY = slurY - 9;
-          trailingGlyphChildren.push(`<path d="M ${formatSvgNumber(slurStartX)},${formatSvgNumber(slurY)} C ${formatSvgNumber(firstNoteX + controlInset)},${formatSvgNumber(topControlY)},${formatSvgNumber(lastNoteX - controlInset)},${formatSvgNumber(topControlY)},${formatSvgNumber(slurEndX)},${formatSvgNumber(slurY)} M ${formatSvgNumber(slurEndX)},${formatSvgNumber(slurY)} C  ${formatSvgNumber(lastNoteX - controlInset)},${formatSvgNumber(bottomControlY)},${formatSvgNumber(firstNoteX + controlInset)},${formatSvgNumber(bottomControlY)},${formatSvgNumber(slurStartX)},${formatSvgNumber(slurY)}" stroke-width="0.5" stroke="#1b1b1b" ></path>`);
+          const scaledFirstNoteX = activeGroup.scaledXs?.[0] ?? scaledInteger(Math.round(firstNoteX));
+          const scaledLastNoteX = activeGroup.scaledXs?.[activeGroup.scaledXs.length - 1] ?? scaledInteger(Math.round(lastNoteX));
+          const scaledNoteStep = activeGroup.scaledXs && activeGroup.scaledXs.length > 1
+            ? activeGroup.scaledXs[1] - activeGroup.scaledXs[0]
+            : decimalStringToScaled(formatSvgNumber(noteStep));
+          const controlMultiplier = BigInt((activeGroup.size - 1) * 3);
+          const scaledControlInset = scaledMulDiv(scaledNoteStep, controlMultiplier, BIGINT_TEN);
+          const slurStartXText = formatScaledSvgNumber(scaledFirstNoteX + scaledInteger(1));
+          const slurEndXText = formatScaledSvgNumber(scaledLastNoteX - scaledInteger(1));
+          const leftControlXText = formatScaledSvgNumber(scaledFirstNoteX + scaledControlInset);
+          const rightControlXText = formatScaledSvgNumber(scaledLastNoteX - scaledControlInset);
+          groupedDecorationChildren.push(`<path d="M ${slurStartXText},${formatSvgNumber(slurY)} C ${leftControlXText},${formatSvgNumber(topControlY)},${rightControlXText},${formatSvgNumber(topControlY)},${slurEndXText},${formatSvgNumber(slurY)} M ${slurEndXText},${formatSvgNumber(slurY)} C  ${rightControlXText},${formatSvgNumber(bottomControlY)},${leftControlXText},${formatSvgNumber(bottomControlY)},${slurStartXText},${formatSvgNumber(slurY)}" stroke-width="0.5" stroke="#1b1b1b" ></path>`);
           if (activeGroup.size >= 3 && activeGroup.size <= 4) {
-            trailingGlyphChildren.push(svgUse((firstNoteX + lastNoteX) / 2, slurY - 7, `lianyin_shuzi_${activeGroup.size}`, ""));
+            const labelXText = formatScaledSvgNumber(scaledMulDiv(scaledFirstNoteX + scaledLastNoteX, BIGINT_ONE, BIGINT_TWO));
+            groupedDecorationChildren.push(svgUse(labelXText, slurY - 7, `lianyin_shuzi_${activeGroup.size}`, ""));
           }
           activeGroup = null;
         }
@@ -768,13 +866,25 @@ export function renderJpsToSvg(input: string): string {
       }
 
       if (rowHasGroupedNotes && event.type === "note" && event.groupSize) {
-        x = roundSvgCoordinate(x + groupedNoteStep * (event.groupEnd ? 1.5 : 1));
+        if (groupedXScaled !== null && groupedNoteStepScaled !== null) {
+          groupedXScaled += groupedNoteStepScaled * BigInt(event.groupEnd ? 15 : 10) / BIGINT_TEN;
+          x = scaledToNumber(groupedXScaled);
+        } else {
+          x += groupedNoteStep * (event.groupEnd ? 1.5 : 1);
+        }
         return;
       }
 
       if (rowIsCompactPlainDense && event.type === "note") {
+        if (compactBeamStartX === null) {
+          compactBeamStartX = lastNoteX;
+        }
         compactBeatProgress += event.time;
         const isBeatBoundary = Math.abs(compactBeatProgress - Math.round(compactBeatProgress)) < 1e-9;
+        if (isBeatBoundary && compactBeamStartX !== null && lastNoteX !== null) {
+          durationLineChildren.push(slashBeamLine(compactBeamStartX - 6, rowY + 13, lastNoteX + 6));
+          compactBeamStartX = null;
+        }
         x += compactNoteStep * (isBeatBoundary ? 1.5 : 1);
         return;
       }
@@ -784,7 +894,7 @@ export function renderJpsToSvg(input: string): string {
 
     rowY += lyricLine?.type === "C" ? 106 : 78;
   });
-  const outputChildren = [...svgChildren, ...trailingGlyphChildren];
+  const outputChildren = [...svgChildren, ...durationLineChildren, ...octaveGlyphChildren, ...groupedDecorationChildren];
   const usedGlyphIds = Array.from(new Set(Array.from(outputChildren.join("\n").matchAll(/xlink:href="#([^"]+)"/g)).map((match) => match[1])));
 
   return `<svg width="${width}" height="${height}" version="1.1" viewBox="${viewBox}" encoding="UTF-8" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" height="100%" width="100%" fill="#ffffff" />${defaultGlyphDefs(usedGlyphIds)}\n${outputChildren.join("\n")}
@@ -792,8 +902,10 @@ export function renderJpsToSvg(input: string): string {
 `;
 }
 
-function svgUse(x: number, y: number, id: string, attrs: string): string {
-  return `<use x="${formatSvgNumber(x)}" y="${formatSvgNumber(y)}" xlink:href="#${id}"${attrs} xmlns:xlink="http://www.w3.org/1999/xlink" ></use>`;
+function svgUse(x: number | string, y: number | string, id: string, attrs: string): string {
+  const xValue = typeof x === "string" ? x : formatSvgNumber(x);
+  const yValue = typeof y === "string" ? y : formatSvgNumber(y);
+  return `<use x="${xValue}" y="${yValue}" xlink:href="#${id}"${attrs} xmlns:xlink="http://www.w3.org/1999/xlink" ></use>`;
 }
 
 function pushTemporaryMeter(svgChildren: string[], x: number, rowY: number, dynamic: string): void {
