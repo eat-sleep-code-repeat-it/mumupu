@@ -131,6 +131,66 @@ function slashBeamLine(x1: number, y: number, x2: number): string {
   return `<line x1="${formatSvgNumber(x1)}" y1="${formatSvgNumber(y)}" x2="${formatSvgNumber(x2)}" y2="${formatSvgNumber(y)}" data-type="jianshixian" stroke-width="2" stroke="#1b1b1b" ></line>`;
 }
 
+function usesNaturalWidthLayout(parsed: ParsedJps, events: JpsEvent[]): boolean {
+  return (parsed.header.P ?? "").includes(",")
+    && events.some((event) => event.type === "hold" || (event.slurStartCount ?? 0) > 0);
+}
+
+function hasHorizontalDecoration(event: JpsEvent | undefined): boolean {
+  return Boolean(event && event.type === "note" && event.accidental);
+}
+
+function hasLeadingAccidental(event: JpsEvent | undefined): boolean {
+  return Boolean(event && event.type === "note" && event.accidental);
+}
+
+function naturalEventAdvances(events: JpsEvent[]): number[] {
+  let measureTime = 0;
+
+  return events.map((event, eventIndex) => {
+    const nextEvent = events[eventIndex + 1];
+    if (event.type === "bar") {
+      measureTime = 0;
+      if (eventIndex === events.length - 1) return 1.8;
+      return 2.8 + (event.annotation?.startsWith("p:") ? 2 : 0) + (hasLeadingAccidental(nextEvent) ? 0.4 : 0);
+    }
+
+    if (event.type === "dynamic") {
+      return 2;
+    }
+
+    if (event.type !== "note" && event.type !== "hold") {
+      return 0;
+    }
+
+    measureTime += event.time;
+    let width = 1 + event.time * 2;
+    const isBeatBoundary = event.time < 1 && Math.abs(measureTime - Math.round(measureTime)) < 1e-9;
+    if (isBeatBoundary) {
+      width += 1;
+    }
+    if ((event.time >= 1 || isBeatBoundary) && hasHorizontalDecoration(event)) {
+      width += 0.4;
+    }
+    if (hasLeadingAccidental(nextEvent)) {
+      width += 0.4;
+    }
+    if (isBeatBoundary && event.accidental && nextEvent?.slurStartCount && hasLeadingAccidental(nextEvent)) {
+      width += 0.4;
+    }
+    if (isBeatBoundary && nextEvent?.type === "note" && nextEvent.pitch && event.pitch !== nextEvent.pitch && ["1", "4", "6"].includes(event.pitch ?? "")) {
+      width += 0.4;
+    }
+    if (nextEvent?.type === "bar") {
+      width -= 0.2;
+      if (event.durationMark.includes("/") && !event.accidental && ["4", "5"].includes(event.pitch ?? "")) {
+        width += 0.4;
+      }
+    }
+    return width;
+  });
+}
+
 function primaryTitle(parsed: ParsedJps): string {
   return parsed.headerValues.B?.[0] ?? parsed.header.B ?? parsed.header.V ?? "JPS Music";
 }
@@ -671,6 +731,7 @@ function attachLyrics(notes: JpsNote[], start: number, lyrics: string[]): void {
 export function renderJpsToSvg(input: string): string {
   const parsed = parseJps(input);
   const events = parseJpsEvents(input);
+  const useNaturalWidths = usesNaturalWidthLayout(parsed, events);
   const width = 1000;
   const height = 1415;
   const viewBox = `0 0 ${width} ${height}`;
@@ -768,6 +829,10 @@ export function renderJpsToSvg(input: string): string {
       && rowEvents.every((event) => event.type === "bar" || event.type === "note")
       && plainDenseNotes.length > 0
       && plainDenseNotes.every((event) => event.time === 0.5);
+    const naturalAdvances = useNaturalWidths && !rowHasGroupedNotes && !rowIsCompactPlainDense
+      ? naturalEventAdvances(rowEvents)
+      : null;
+    const naturalScale = naturalAdvances ? 854 / naturalAdvances.reduce((sum, advance) => sum + advance, 0) : 0;
     const unit = Math.max(1, (right - left - structuralWidth) / totalTime);
     const groupedNoteStepText = rowHasGroupedNotes && groupCount > 0
       ? groupedClusterSize === 4
@@ -795,7 +860,7 @@ export function renderJpsToSvg(input: string): string {
     const noteXs: number[] = [];
     let compactBeatProgress = 0;
     let compactBeamStartX: number | null = null;
-    let mixedBeamProgress = 0;
+    let measureBeatProgress = 0;
     let mixedBeamStartX: number | null = null;
     let mixedBeamLastX: number | null = null;
     const ordinarySlurs: Array<{ x: number; maxOctave: number; hasHold: boolean }> = [];
@@ -804,7 +869,6 @@ export function renderJpsToSvg(input: string): string {
       if (mixedBeamStartX !== null && mixedBeamLastX !== null) {
         durationLineChildren.push(slashBeamLine(mixedBeamStartX - 6, rowY + 13, mixedBeamLastX + 6));
       }
-      mixedBeamProgress = 0;
       mixedBeamStartX = null;
       mixedBeamLastX = null;
     };
@@ -815,17 +879,22 @@ export function renderJpsToSvg(input: string): string {
 
       if (event.type === "bar") {
         flushMixedBeam();
+        measureBeatProgress = 0;
         const isEndBar = event.code === "|j";
         const isHiddenBar = event.code === "|/" || event.code === "|*";
         const rowClosingBarX = rowIsCompactPlainDense ? compactRight : closingBarX;
-        const barX = isLeadingBar ? left : isEndBar || isClosingBar ? rowClosingBarX : x - internalBarOffset;
+        const barX = naturalAdvances
+          ? isEndBar || isClosingBar ? rowClosingBarX : x
+          : isLeadingBar ? left : isEndBar || isClosingBar ? rowClosingBarX : x - internalBarOffset;
         if (!isHiddenBar) {
           svgChildren.push(svgUse(barX, rowY, isEndBar ? "jieshufu" : "xiaojiexian", ` notepos="${event.notepos}" time="0" audio="" code="${escapeXmlAttribute(event.code)}"`));
         }
         if (event.annotation?.startsWith("p:")) {
-          pushTemporaryMeter(svgChildren, barX + 11, rowY, event.annotation);
+          pushTemporaryMeter(svgChildren, naturalAdvances ? barX + naturalScale * 2 : barX + 11, rowY, event.annotation);
         }
-        x += isHiddenBar ? (event.code === "|*" ? barAdvance : 0) : isEndBar || isLeadingBar || isClosingBar ? 0 : barAdvance;
+        x += naturalAdvances
+          ? naturalAdvances[eventIndex] * naturalScale
+          : isHiddenBar ? (event.code === "|*" ? barAdvance : 0) : isEndBar || isLeadingBar || isClosingBar ? 0 : barAdvance;
         return;
       }
 
@@ -1013,15 +1082,26 @@ export function renderJpsToSvg(input: string): string {
       }
 
       if (!rowHasGroupedNotes && event.type === "note" && event.durationMark.includes("/")) {
+        if (event.pitch === null) {
+          flushMixedBeam();
+        }
         mixedBeamStartX ??= lastNoteX;
         mixedBeamLastX = lastNoteX;
-        mixedBeamProgress += event.time;
-        const isBeatBoundary = Math.abs(mixedBeamProgress - Math.round(mixedBeamProgress)) < 1e-9;
-        if (isBeatBoundary) {
+        measureBeatProgress += event.time;
+        const isBeatBoundary = Math.abs(measureBeatProgress - Math.round(measureBeatProgress)) < 1e-9;
+        if (isBeatBoundary || event.pitch === null || event.slurEndCount) {
           flushMixedBeam();
         }
       } else {
         flushMixedBeam();
+        if (!rowHasGroupedNotes && (event.type === "note" || event.type === "hold")) {
+          measureBeatProgress += event.time;
+        }
+      }
+
+      if (naturalAdvances) {
+        x += naturalAdvances[eventIndex] * naturalScale;
+        return;
       }
 
       x += event.time * unit;
