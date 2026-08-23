@@ -56,7 +56,8 @@
 - [x] Notes `1-7`, rests `0`, hidden rests `8`, holds `-`, octave marks, accidentals, dots, and slash durations.
 - [ ] Rhythm note `9`.
 - [ ] Custom beat joins `~` and forced splits `^`.
-- [ ] Dynamics suffixes such as `&mp`, `&mf`, `&p`, and other documented symbol codes.
+- [x] Parse and visibly render song dynamics `&p`, `&pp`, `&mp`, `&mf`, `&f`, and `&rit` with oracle-compatible note metadata and placement.
+- [ ] Replace dynamics text with exact locally owned path glyphs and oracle-compatible definition ordering.
 - [x] Crescendo/diminuendo spans `<`, `>`, and `!`.
 - [ ] Hairpin `+` vertical adjustments.
 - [ ] Front grace notes `[...]` and rear grace notes `[h...]` with pitch, octave, accidental, and duration marks.

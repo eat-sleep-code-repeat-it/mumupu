@@ -50,6 +50,7 @@ export interface JpsEvent {
   slurEndCount?: number;
   hairpinStart?: "crescendo" | "diminuendo";
   hairpinEnd?: boolean;
+  dynamicMark?: string;
 }
 
 export interface JpsNote {
@@ -80,9 +81,9 @@ const BIGINT_5000 = BigInt(5000);
 const BIGINT_10000 = BigInt(10000);
 const BIGINT_100000000000 = BigInt("100000000000");
 
-function groupedStartCode(rawValue: string, pitchSuffix: string, durationMark: string): string {
+function groupedStartCode(rawValue: string, pitchSuffix: string, durationMark: string, decorationCode = ""): string {
   const oraclePitchSeparator = rawValue === "7" ? " " : "";
-  return `${rawValue}(ys${oraclePitchSeparator}${pitchSuffix}${durationMark}`;
+  return `${rawValue}(ys${oraclePitchSeparator}${pitchSuffix}${durationMark}${decorationCode}`;
 }
 
 function decimalStringToScaled(value: string): bigint {
@@ -384,7 +385,8 @@ export function parseJpsEvents(input: string): JpsEvent[] {
       const parsedToken = parseJpsTokenParts(token);
       const isDynamic = parsedToken.annotation?.startsWith("p:") ?? false;
       const activeTuplet = groupStack.findLast((group) => group.isTuplet);
-      const normalizedCode = `${parsedToken.rawValue}${parsedToken.pitchSuffix}${parsedToken.durationMark}${parsedToken.hairpinEnd ? "!" : ""}`;
+      const decorationCode = `${parsedToken.dynamicMark ? `+${parsedToken.dynamicMark}` : ""}${parsedToken.hairpinEnd ? "!" : ""}`;
+      const normalizedCode = `${parsedToken.rawValue}${parsedToken.pitchSuffix}${parsedToken.durationMark}${decorationCode}`;
       const isGroupedNote = !isDynamic && Boolean(activeTuplet);
       const isGroupStart = isGroupedNote && token.startsWith("y") && token.length > 1;
       const slurStartCount = isDynamic ? 0 : groupStack.filter((group) => !group.isTuplet && group.startsOnNextNote).length;
@@ -396,9 +398,9 @@ export function parseJpsEvents(input: string): JpsEvent[] {
       events.push({
         ...createJpsEvent(isDynamic ? "dynamic" : "note", token, melodyLineIndex, eventIndex, measureIndex, lineIndex),
         code: isGroupStart
-          ? groupedStartCode(parsedToken.rawValue, parsedToken.pitchSuffix, parsedToken.durationMark)
+          ? groupedStartCode(parsedToken.rawValue, parsedToken.pitchSuffix, parsedToken.durationMark, decorationCode)
           : slurStartCount > 0
-            ? `${parsedToken.rawValue}${"(".repeat(slurStartCount)}${parsedToken.pitchSuffix}${parsedToken.durationMark}`
+            ? `${parsedToken.rawValue}${"(".repeat(slurStartCount)}${parsedToken.pitchSuffix}${parsedToken.durationMark}${decorationCode}`
             : normalizedCode,
         pitch: isDynamic || parsedToken.isRest ? null : parsedToken.rawValue,
         audio: parsedToken.isRest ? "0" : parsedToken.audioValue,
@@ -413,6 +415,7 @@ export function parseJpsEvents(input: string): JpsEvent[] {
         slurStartCount: slurStartCount || undefined,
         hairpinStart: parsedToken.hairpinStart,
         hairpinEnd: parsedToken.hairpinEnd,
+        dynamicMark: parsedToken.dynamicMark,
       });
       eventIndex += 1;
     }
@@ -498,12 +501,18 @@ function parseJpsTokenParts(token: string): {
   isRest: boolean;
   hairpinStart: "crescendo" | "diminuendo" | undefined;
   hairpinEnd: boolean;
+  dynamicMark: string | undefined;
 } {
   const normalizedToken = token.startsWith("y") && token.length > 1 ? token.slice(1) : token;
   const { baseToken, annotation } = extractTokenAnnotation(normalizedToken);
   const hairpinStart = baseToken.includes("<") ? "crescendo" : baseToken.includes(">") ? "diminuendo" : undefined;
   const hairpinEnd = baseToken.includes("!");
-  const notationToken = baseToken.replace(/[<>]+\+*/g, "").replace(/!/g, "");
+  const dynamicMatch = baseToken.match(/&(rit|pp|mp|mf|p|f)(?=&|$|[-/.<>!])/);
+  const dynamicMark = dynamicMatch?.[1];
+  const notationToken = baseToken
+    .replace(dynamicMatch?.[0] ?? "", "")
+    .replace(/[<>]+\+*/g, "")
+    .replace(/!/g, "");
   const accidentalMatch = notationToken.match(/^(\d+)(.*)$/);
   const rawValue = accidentalMatch ? accidentalMatch[1] : notationToken;
   const restOfToken = accidentalMatch ? accidentalMatch[2] : "";
@@ -523,6 +532,7 @@ function parseJpsTokenParts(token: string): {
     isRest: rawValue === "0" || rawValue === "8",
     hairpinStart,
     hairpinEnd,
+    dynamicMark,
   };
 }
 
@@ -679,6 +689,7 @@ export function renderJpsToSvg(input: string): string {
   const octaveGlyphChildren: string[] = [];
   const groupedDecorationChildren: string[] = [];
   const expressionChildren: string[] = [];
+  const dynamicChildren: string[] = [];
 
   const subtitle = secondaryTitle(parsed);
   if (subtitle) {
@@ -848,6 +859,12 @@ export function renderJpsToSvg(input: string): string {
           expressionChildren.push(`<line x1="${formatSvgNumber(startX)}" y1="${formatSvgNumber(centerY - startSpread)}" x2="${formatSvgNumber(endX)}" y2="${formatSvgNumber(centerY - endSpread)}" stroke-width="1" stroke="#1b1b1b" fill="none" ></line>`);
           activeHairpin = null;
         }
+        if (event.dynamicMark) {
+          const slurDepth = event.slurStartCount ?? 0;
+          const dynamicX = noteX - Math.max(0, slurDepth - 1) * 20;
+          const dynamicY = rowY - 3 - Math.max(0, event.octave) * 8 - slurDepth * 8;
+          dynamicChildren.push(`<text x="${formatSvgNumber(dynamicX)}" y="${formatSvgNumber(dynamicY)}" text-anchor="middle" fill="#1b1b1b" font-size="14" font-family="Times New Roman" font-style="italic" font-weight="bold">${escapeXml(event.dynamicMark)}</text>`);
+        }
         if (event.groupStart && event.groupSize && event.groupSize > 1) {
           activeGroup = {
             startX: noteX,
@@ -1014,7 +1031,7 @@ export function renderJpsToSvg(input: string): string {
 
     rowY += lyricLine?.type === "C" ? 106 : 78;
   });
-  const outputChildren = [...svgChildren, ...durationLineChildren, ...octaveGlyphChildren, ...groupedDecorationChildren, ...expressionChildren];
+  const outputChildren = [...svgChildren, ...durationLineChildren, ...octaveGlyphChildren, ...groupedDecorationChildren, ...expressionChildren, ...dynamicChildren];
   const usedGlyphIds = Array.from(new Set(Array.from(outputChildren.join("\n").matchAll(/xlink:href="#([^"]+)"/g)).map((match) => match[1])));
 
   return `<svg width="${width}" height="${height}" version="1.1" viewBox="${viewBox}" encoding="UTF-8" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" height="100%" width="100%" fill="#ffffff" />${defaultGlyphDefs(usedGlyphIds)}\n${outputChildren.join("\n")}

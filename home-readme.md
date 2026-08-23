@@ -51,6 +51,7 @@ Checked-in oracle caches are preferred. A remote SVG may be obtained only when t
 - `sandu-mojin.jps` matches its canonical cached oracle byte-for-byte.
 - `memory-from-cats.jps` is rendered locally and supports live edits, but does not yet match its oracle byte-for-byte.
 - Crescendo and diminuendo spans using `<`, `>`, and `!` render as local SVG lines; `+` vertical adjustment remains pending.
+- Attached dynamics `&p`, `&pp`, `&mp`, `&mf`, `&f`, and `&rit` render visibly with note-aware placement; exact path-glyph parity remains pending.
 
 The remaining `memory-from-cats.jps` differences are primarily natural-width row spacing, one ordinary slur path, and five duration beams. These gaps are renderer TODOs; they are not bypassed with cached page output.
 
