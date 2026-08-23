@@ -2,12 +2,10 @@
 
 ## Current Unsolved Renderer Issues
 
-- Replace the current full-width row normalization in `lib/translate.ts` with the oracle's compact dense-row spacing engine for slash-heavy exercise rows.
-- Finish grouped-note cluster rendering so grouped rows match oracle geometry, including double-curve slur shapes and grouped-count glyph placement.
-- Embed and emit grouped count glyph defs such as `lianyin_shuzi_3` and `lianyin_shuzi_4` in the same structure and ordering the oracle uses.
-- Finish parity for `public/jps-files/example-002-sandumojin.jps`; grouped tuplets moved closer, but dense-row spacing and grouped decoration are still not exact.
-- Finish parity for `public/jps-files/memory-from-cats.jps`; it remains the largest unresolved score and depends on the same dense-row and complex-notation layout gaps.
-- Re-run repo parity after each dense-row/layout fix until `public/jps-files` is fully clean again.
+- Finish parity for `public/jps-files/memory-from-cats.jps`; ordinary slurs, mixed-row beams, and long ties are implemented, but exact spacing still controls one path and five beam differences.
+- Reserve oracle-compatible horizontal space for bar-attached temporary meter changes.
+- Match spacing-dependent beam grouping, the remaining ordinary-slur path, and decoration definition/output ordering.
+- Re-run `public/songs` parity after `memory-from-cats.jps` is clean, then cluster remaining failures by notation pattern.
 
 ## Oracle Cache
 
@@ -59,6 +57,6 @@ Status on 2026-08-19: checked 37 JPS files in `public/songs`; mismatches found i
 
 ## Next Fix Order
 
-- Fix the dense-row spacing engine first, because it affects both `example-002-sandumojin.jps` and many `public/songs` mismatches.
-- Then finish grouped-note decoration parity.
-- Then re-run songs parity and cluster remaining failures by notation pattern instead of file-by-file chasing.
+- Replace full-width normalization with the spacing model used by `memory-from-cats.jps`, including temporary-meter width and beat-dependent gaps.
+- Use the resulting note gaps to split isolated beams and render the two long ties with endpoint glyphs.
+- Re-run songs parity and cluster remaining failures by notation pattern instead of file-by-file chasing.

@@ -46,6 +46,8 @@ export interface JpsEvent {
   groupSize?: number;
   groupStart?: boolean;
   groupEnd?: boolean;
+  slurStartCount?: number;
+  slurEndCount?: number;
 }
 
 export interface JpsNote {
@@ -271,7 +273,7 @@ export function parseJpsEvents(input: string): JpsEvent[] {
     if (line.type !== "Q") return;
 
     let eventIndex = 0;
-    const activeGroupSizes: number[] = [];
+    const groupStack: Array<{ size: number; isTuplet: boolean; startsOnNextNote: boolean }> = [];
 
     const countGroupNotes = (startTokenIndex: number): number => {
       let depth = 1;
@@ -309,6 +311,7 @@ export function parseJpsEvents(input: string): JpsEvent[] {
         const annotation = annotationToken?.startsWith("p:") ? annotationToken : null;
         events.push({
           ...createJpsEvent("bar", isFinalDoubleBar ? "|j" : token, melodyLineIndex, eventIndex, measureIndex, lineIndex),
+          code: annotation ? `${token}'${annotation}'` : isFinalDoubleBar ? "|j" : token,
           annotation,
         });
         measureIndex += 1;
@@ -324,18 +327,26 @@ export function parseJpsEvents(input: string): JpsEvent[] {
       if (token === "(") {
         const groupSize = countGroupNotes(tokenIndex);
         if (groupSize > 0) {
-          activeGroupSizes.push(groupSize);
+          groupStack.push({
+            size: groupSize,
+            isTuplet: line.tokens[tokenIndex + 1]?.startsWith("y") ?? false,
+            startsOnNextNote: true,
+          });
         }
         continue;
       }
 
       if (token === ")") {
-        const groupSize = activeGroupSizes.pop();
+        const group = groupStack.pop();
         const lastEvent = events.at(-1);
-        if (groupSize && lastEvent && lastEvent.lineIndex === lineIndex && lastEvent.type === "note") {
-          lastEvent.groupEnd = true;
-          lastEvent.groupSize = groupSize;
+        if (group && lastEvent && lastEvent.lineIndex === lineIndex && lastEvent.type === "note") {
           lastEvent.code = `${lastEvent.code})`;
+          if (group.isTuplet) {
+            lastEvent.groupEnd = true;
+            lastEvent.groupSize = group.size;
+          } else {
+            lastEvent.slurEndCount = (lastEvent.slurEndCount ?? 0) + 1;
+          }
         }
         continue;
       }
@@ -361,23 +372,34 @@ export function parseJpsEvents(input: string): JpsEvent[] {
 
       const parsedToken = parseJpsTokenParts(token);
       const isDynamic = parsedToken.annotation?.startsWith("p:") ?? false;
-      const activeGroupSize = activeGroupSizes.at(-1);
-      const normalizedCode = token.startsWith("y") && token.length > 1 ? token.slice(1) : token;
-      const isGroupedNote = !isDynamic && Boolean(activeGroupSize);
+      const activeTuplet = groupStack.findLast((group) => group.isTuplet);
+      const normalizedCode = `${parsedToken.rawValue}${parsedToken.pitchSuffix}${parsedToken.durationMark}`;
+      const isGroupedNote = !isDynamic && Boolean(activeTuplet);
       const isGroupStart = isGroupedNote && token.startsWith("y") && token.length > 1;
+      const slurStartCount = isDynamic ? 0 : groupStack.filter((group) => !group.isTuplet && group.startsOnNextNote).length;
+      groupStack.forEach((group) => {
+        if (!group.isTuplet) {
+          group.startsOnNextNote = false;
+        }
+      });
       events.push({
         ...createJpsEvent(isDynamic ? "dynamic" : "note", token, melodyLineIndex, eventIndex, measureIndex, lineIndex),
-        code: isGroupStart ? groupedStartCode(parsedToken.rawValue, parsedToken.pitchSuffix, parsedToken.durationMark) : normalizedCode,
+        code: isGroupStart
+          ? groupedStartCode(parsedToken.rawValue, parsedToken.pitchSuffix, parsedToken.durationMark)
+          : slurStartCount > 0
+            ? `${parsedToken.rawValue}${"(".repeat(slurStartCount)}${parsedToken.pitchSuffix}${parsedToken.durationMark}`
+            : normalizedCode,
         pitch: isDynamic || parsedToken.isRest ? null : parsedToken.rawValue,
         audio: parsedToken.isRest ? "0" : parsedToken.audioValue,
-        time: isDynamic ? 0 : activeGroupSize ? 1 / activeGroupSize : durationTime(parsedToken.durationMark),
+        time: isDynamic ? 0 : activeTuplet ? 1 / activeTuplet.size : durationTime(parsedToken.durationMark),
         durationMark: parsedToken.durationMark,
         octave: parsedToken.octave,
         accidental: parsedToken.accidental,
         annotation: parsedToken.annotation,
         isHiddenRest: parsedToken.rawValue === "8",
-        groupSize: activeGroupSize,
+        groupSize: activeTuplet?.size,
         groupStart: isGroupStart,
+        slurStartCount: slurStartCount || undefined,
       });
       eventIndex += 1;
     }
@@ -656,7 +678,7 @@ export function renderJpsToSvg(input: string): string {
   const timeSignatures = (parsed.header.P ?? "").split(",").map((value) => value.trim()).filter(Boolean);
   timeSignatures.forEach((signature, index) => {
     const [numerator, denominator] = signature.split("/");
-    const signatureX = 140 + index * 32;
+    const signatureX = timeSignatures.length === 3 ? 145 + index * 27 : 140 + index * 32;
     if (numerator && denominator) {
       svgChildren.push(svgUse(signatureX - 10, 176, "paihao_xian", ""));
       svgChildren.push(svgUse(signatureX, 164, `shuzi_b_bian_${numerator}`, ""));
@@ -666,10 +688,10 @@ export function renderJpsToSvg(input: string): string {
 
   if (hasTempo) {
     svgChildren.push(svgUse(80, 216, "jiepaifu", ""));
-    svgChildren.push(`<text x="112" y="217" dy="5.368" fill="#1b1b1b" font-size="16" font-family="Microsoft YaHei" data-jiepai="${escapeXmlAttribute(parsed.header.J || "")}">${escapeXml(parsed.header.J || "")}</text>`);
+    svgChildren.push(`<text x="112" y="217" dy="5.368" fill="#1b1b1b" font-size="16" font-family="Microsoft YaHei" data-jiepai="${escapeXmlAttribute(parsed.header.J || "")}" >${escapeXml(parsed.header.J || "")}</text>`);
   }
   const credits = parsed.headerValues.Z ?? [];
-  const creditBaseY = hasTempo ? 205 : 196;
+  const creditBaseY = hasTempo ? 226 : 196;
   [...credits].reverse().forEach((credit, index) => {
     const creditY = creditBaseY - index * 21;
     svgChildren.push(`<text x="920" y="${creditY}" dy="-2.632" text-anchor="end" fill="#1b1b1b" font-size="16" font-family="Microsoft YaHei" >${escapeXml(credit)}</text>`);
@@ -741,12 +763,25 @@ export function renderJpsToSvg(input: string): string {
     const noteXs: number[] = [];
     let compactBeatProgress = 0;
     let compactBeamStartX: number | null = null;
+    let mixedBeamProgress = 0;
+    let mixedBeamStartX: number | null = null;
+    let mixedBeamLastX: number | null = null;
+    const ordinarySlurs: Array<{ x: number; maxOctave: number; hasHold: boolean }> = [];
+    const flushMixedBeam = (): void => {
+      if (mixedBeamStartX !== null && mixedBeamLastX !== null) {
+        durationLineChildren.push(slashBeamLine(mixedBeamStartX - 6, rowY + 13, mixedBeamLastX + 6));
+      }
+      mixedBeamProgress = 0;
+      mixedBeamStartX = null;
+      mixedBeamLastX = null;
+    };
 
     rowEvents.forEach((event, eventIndex) => {
       const isLeadingBar = hasOnlyLeadingMarkersBeforeFirstVisibleBar && eventIndex === firstVisibleBarIndex;
       const isClosingBar = eventIndex === lastVisibleBarIndex;
 
       if (event.type === "bar") {
+        flushMixedBeam();
         const isEndBar = event.code === "|j";
         const isHiddenBar = event.code === "|/" || event.code === "|*";
         const rowClosingBarX = rowIsCompactPlainDense ? compactRight : closingBarX;
@@ -762,6 +797,9 @@ export function renderJpsToSvg(input: string): string {
       }
 
       if (event.type === "hold") {
+        ordinarySlurs.forEach((slur) => {
+          slur.hasHold = true;
+        });
         svgChildren.push(svgUse(x, rowY, "yanyinfu", ` time="${formatTimeValue(event.time)}" audio="" notepos="${event.notepos}" code="-"`));
       } else if (event.type === "dynamic") {
         pushTemporaryMeter(svgChildren, x + 11, rowY, event.annotation ?? event.code);
@@ -797,7 +835,8 @@ export function renderJpsToSvg(input: string): string {
         for (let octaveIndex = 0; !event.isHiddenRest && octaveIndex < Math.abs(event.octave); octaveIndex += 1) {
           const octaveGlyph = event.octave > 0 ? "yingao_gao" : "yingao_di";
           const octaveX = event.pitch === "4" ? noteX + 2.5 : noteX;
-          const octaveY = event.octave > 0 ? rowY - octaveIndex * 8 : rowY + 5 + octaveIndex * 8;
+          const lowerOctaveBaseOffset = rowHasGroupedNotes || rowIsCompactPlainDense ? 5 : 1;
+          const octaveY = event.octave > 0 ? rowY - octaveIndex * 8 : rowY + lowerOctaveBaseOffset + octaveIndex * 8;
           octaveGlyphChildren.push(svgUse(octaveX, octaveY, octaveGlyph, ""));
         }
         const dotCount = event.isHiddenRest ? 0 : (event.durationMark.match(/\./g) ?? []).length;
@@ -806,6 +845,38 @@ export function renderJpsToSvg(input: string): string {
         }
         if (!event.isHiddenRest && event.annotation) {
           svgChildren.push(`<text x="${formatSvgNumber(noteX)}" y="${formatSvgNumber(rowY - 20)}" text-anchor="middle" fill="#1b1b1b" font-size="12" font-family="Microsoft YaHei">${escapeXml(event.annotation)}</text>`);
+        }
+
+        ordinarySlurs.forEach((slur) => {
+          slur.maxOctave = Math.max(slur.maxOctave, Math.max(0, event.octave));
+        });
+        for (let slurEndIndex = 0; slurEndIndex < (event.slurEndCount ?? 0); slurEndIndex += 1) {
+          const ordinarySlurStart = ordinarySlurs.pop();
+          if (!ordinarySlurStart || noteX === ordinarySlurStart.x) {
+            continue;
+          }
+          if (ordinarySlurStart.hasHold && noteX - ordinarySlurStart.x > 140) {
+            const capY = rowY - 25.95;
+            const leftCapX = ordinarySlurStart.x + 12;
+            const rightCapX = noteX - 12;
+            groupedDecorationChildren.push(svgUse(leftCapX, capY, "lianyinxian_zuo", ""));
+            groupedDecorationChildren.push(svgUse(rightCapX, capY, "lianyinxian_you", ""));
+            groupedDecorationChildren.push(`<line x1="${formatSvgNumber(leftCapX + 0.8)}" y1="${formatSvgNumber(capY + 0.75)}" x2="${formatSvgNumber(rightCapX + 1)}" y2="${formatSvgNumber(capY + 0.75)}" stroke-width="1.2" stroke="#1b1b1b" fill="none" ></line>`);
+          } else {
+            const slurOctaveOffset = ordinarySlurStart.maxOctave === 0
+              ? 16
+              : 21 + (ordinarySlurStart.maxOctave - 1) * 8;
+            const slurY = rowY - slurOctaveOffset;
+            const slurStartX = ordinarySlurStart.x + 1;
+            const slurEndX = noteX - 1;
+            const controlInset = (noteX - ordinarySlurStart.x) * 0.3;
+            const leftControlX = ordinarySlurStart.x + controlInset;
+            const rightControlX = noteX - controlInset;
+            groupedDecorationChildren.push(`<path d="M ${formatSvgNumber(slurStartX)},${formatSvgNumber(slurY)} C ${formatSvgNumber(leftControlX)},${formatSvgNumber(slurY - 10)},${formatSvgNumber(rightControlX)},${formatSvgNumber(slurY - 10)},${formatSvgNumber(slurEndX)},${formatSvgNumber(slurY)} M ${formatSvgNumber(slurEndX)},${formatSvgNumber(slurY)} C  ${formatSvgNumber(rightControlX)},${formatSvgNumber(slurY - 9)},${formatSvgNumber(leftControlX)},${formatSvgNumber(slurY - 9)},${formatSvgNumber(slurStartX)},${formatSvgNumber(slurY)}" stroke-width="0.5" stroke="#1b1b1b" ></path>`);
+          }
+        }
+        for (let slurStartIndex = 0; slurStartIndex < (event.slurStartCount ?? 0); slurStartIndex += 1) {
+          ordinarySlurs.push({ x: noteX, maxOctave: Math.max(0, event.octave), hasHold: false });
         }
 
         if (activeGroup && event.groupEnd && activeGroup.noteXs.length > 1) {
@@ -889,8 +960,22 @@ export function renderJpsToSvg(input: string): string {
         return;
       }
 
+      if (!rowHasGroupedNotes && event.type === "note" && event.durationMark.includes("/")) {
+        mixedBeamStartX ??= lastNoteX;
+        mixedBeamLastX = lastNoteX;
+        mixedBeamProgress += event.time;
+        const isBeatBoundary = Math.abs(mixedBeamProgress - Math.round(mixedBeamProgress)) < 1e-9;
+        if (isBeatBoundary) {
+          flushMixedBeam();
+        }
+      } else {
+        flushMixedBeam();
+      }
+
       x += event.time * unit;
     });
+
+    flushMixedBeam();
 
     rowY += lyricLine?.type === "C" ? 106 : 78;
   });
