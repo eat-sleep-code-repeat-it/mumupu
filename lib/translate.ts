@@ -48,6 +48,8 @@ export interface JpsEvent {
   groupEnd?: boolean;
   slurStartCount?: number;
   slurEndCount?: number;
+  hairpinStart?: "crescendo" | "diminuendo";
+  hairpinEnd?: boolean;
 }
 
 export interface JpsNote {
@@ -370,10 +372,19 @@ export function parseJpsEvents(input: string): JpsEvent[] {
         continue;
       }
 
+      if (token === "!") {
+        const previousEvent = events.findLast((event) => event.lineIndex === lineIndex && event.type === "note");
+        if (previousEvent) {
+          previousEvent.code += "!";
+          previousEvent.hairpinEnd = true;
+        }
+        continue;
+      }
+
       const parsedToken = parseJpsTokenParts(token);
       const isDynamic = parsedToken.annotation?.startsWith("p:") ?? false;
       const activeTuplet = groupStack.findLast((group) => group.isTuplet);
-      const normalizedCode = `${parsedToken.rawValue}${parsedToken.pitchSuffix}${parsedToken.durationMark}`;
+      const normalizedCode = `${parsedToken.rawValue}${parsedToken.pitchSuffix}${parsedToken.durationMark}${parsedToken.hairpinEnd ? "!" : ""}`;
       const isGroupedNote = !isDynamic && Boolean(activeTuplet);
       const isGroupStart = isGroupedNote && token.startsWith("y") && token.length > 1;
       const slurStartCount = isDynamic ? 0 : groupStack.filter((group) => !group.isTuplet && group.startsOnNextNote).length;
@@ -400,6 +411,8 @@ export function parseJpsEvents(input: string): JpsEvent[] {
         groupSize: activeTuplet?.size,
         groupStart: isGroupStart,
         slurStartCount: slurStartCount || undefined,
+        hairpinStart: parsedToken.hairpinStart,
+        hairpinEnd: parsedToken.hairpinEnd,
       });
       eventIndex += 1;
     }
@@ -483,11 +496,16 @@ function parseJpsTokenParts(token: string): {
   durationMark: string;
   annotation: string | null;
   isRest: boolean;
+  hairpinStart: "crescendo" | "diminuendo" | undefined;
+  hairpinEnd: boolean;
 } {
   const normalizedToken = token.startsWith("y") && token.length > 1 ? token.slice(1) : token;
   const { baseToken, annotation } = extractTokenAnnotation(normalizedToken);
-  const accidentalMatch = baseToken.match(/^(\d+)(.*)$/);
-  const rawValue = accidentalMatch ? accidentalMatch[1] : baseToken;
+  const hairpinStart = baseToken.includes("<") ? "crescendo" : baseToken.includes(">") ? "diminuendo" : undefined;
+  const hairpinEnd = baseToken.includes("!");
+  const notationToken = baseToken.replace(/[<>]+\+*/g, "").replace(/!/g, "");
+  const accidentalMatch = notationToken.match(/^(\d+)(.*)$/);
+  const rawValue = accidentalMatch ? accidentalMatch[1] : notationToken;
   const restOfToken = accidentalMatch ? accidentalMatch[2] : "";
   const durationMatch = restOfToken.match(/([-/.]+)$/);
   const durationMark = durationMatch ? durationMatch[1] : "";
@@ -503,6 +521,8 @@ function parseJpsTokenParts(token: string): {
     durationMark,
     annotation,
     isRest: rawValue === "0" || rawValue === "8",
+    hairpinStart,
+    hairpinEnd,
   };
 }
 
@@ -658,6 +678,7 @@ export function renderJpsToSvg(input: string): string {
   const durationLineChildren: string[] = [];
   const octaveGlyphChildren: string[] = [];
   const groupedDecorationChildren: string[] = [];
+  const expressionChildren: string[] = [];
 
   const subtitle = secondaryTitle(parsed);
   if (subtitle) {
@@ -767,6 +788,7 @@ export function renderJpsToSvg(input: string): string {
     let mixedBeamStartX: number | null = null;
     let mixedBeamLastX: number | null = null;
     const ordinarySlurs: Array<{ x: number; maxOctave: number; hasHold: boolean }> = [];
+    let activeHairpin: { type: "crescendo" | "diminuendo"; x: number } | null = null;
     const flushMixedBeam = (): void => {
       if (mixedBeamStartX !== null && mixedBeamLastX !== null) {
         durationLineChildren.push(slashBeamLine(mixedBeamStartX - 6, rowY + 13, mixedBeamLastX + 6));
@@ -813,6 +835,19 @@ export function renderJpsToSvg(input: string): string {
         }
         lastNoteX = noteX;
         noteXs.push(noteX);
+        if (event.hairpinStart) {
+          activeHairpin = { type: event.hairpinStart, x: noteX };
+        }
+        if (event.hairpinEnd && activeHairpin && noteX > activeHairpin.x) {
+          const startX = activeHairpin.x - 7;
+          const endX = noteX + 7;
+          const centerY = rowY - 30;
+          const startSpread = activeHairpin.type === "diminuendo" ? 5 : 0;
+          const endSpread = activeHairpin.type === "crescendo" ? 5 : 0;
+          expressionChildren.push(`<line x1="${formatSvgNumber(startX)}" y1="${formatSvgNumber(centerY + startSpread)}" x2="${formatSvgNumber(endX)}" y2="${formatSvgNumber(centerY + endSpread)}" stroke-width="1" stroke="#1b1b1b" fill="none" ></line>`);
+          expressionChildren.push(`<line x1="${formatSvgNumber(startX)}" y1="${formatSvgNumber(centerY - startSpread)}" x2="${formatSvgNumber(endX)}" y2="${formatSvgNumber(centerY - endSpread)}" stroke-width="1" stroke="#1b1b1b" fill="none" ></line>`);
+          activeHairpin = null;
+        }
         if (event.groupStart && event.groupSize && event.groupSize > 1) {
           activeGroup = {
             startX: noteX,
@@ -979,7 +1014,7 @@ export function renderJpsToSvg(input: string): string {
 
     rowY += lyricLine?.type === "C" ? 106 : 78;
   });
-  const outputChildren = [...svgChildren, ...durationLineChildren, ...octaveGlyphChildren, ...groupedDecorationChildren];
+  const outputChildren = [...svgChildren, ...durationLineChildren, ...octaveGlyphChildren, ...groupedDecorationChildren, ...expressionChildren];
   const usedGlyphIds = Array.from(new Set(Array.from(outputChildren.join("\n").matchAll(/xlink:href="#([^"]+)"/g)).map((match) => match[1])));
 
   return `<svg width="${width}" height="${height}" version="1.1" viewBox="${viewBox}" encoding="UTF-8" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" height="100%" width="100%" fill="#ffffff" />${defaultGlyphDefs(usedGlyphIds)}\n${outputChildren.join("\n")}
