@@ -8,7 +8,6 @@
     "start": "next start",
     "lint": "eslint",
     "transpose": "node scripts/transpose.mjs",
-    "cache:oracle-svg": "node --experimental-strip-types scripts/cache-oracle-svg.mjs",
     "verify:translate": "node --experimental-strip-types scripts/verify-translate.mjs",
     "parity:translate": "node --experimental-strip-types scripts/check-jianpu-parity.mjs"
   },

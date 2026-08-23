@@ -88,7 +88,6 @@ export default function Home() {
     <main className="flex h-screen flex-col">
       {/* Navigation */}
       <nav className="flex h-14 items-center gap-2 border-b bg-gray-100 px-4">
-        <button className="rounded px-3 py-1 hover:bg-gray-200">Open</button>
         <button
           onClick={handleSave}
           className="rounded px-3 py-1 hover:bg-gray-200">
@@ -104,7 +103,6 @@ export default function Home() {
           className={buttonClass(mode === "preview")}>
           Preview
         </button>
-        <button className="rounded px-3 py-1 hover:bg-gray-200">Export</button>
       </nav>
 
       {/* Editor */}
