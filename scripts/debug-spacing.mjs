@@ -10,6 +10,14 @@ const { parseJpsEvents, translate } = await import("../lib/translate.ts");
 const input = await readFile(path.join(workspaceRoot, "public/jps-files/memory-from-cats.jps"), "utf8");
 const localSvg = translate(input);
 const oracleSvg = await readFile(path.join(workspaceRoot, "oracle-cache/jps-files/memory-from-cats.jps.svg"), "utf8");
+
+const firstRawDifference = Array.from({ length: Math.max(localSvg.length, oracleSvg.length) }, (_, index) => index)
+  .find((index) => localSvg[index] !== oracleSvg[index]);
+if (firstRawDifference !== undefined) {
+  console.log("first raw difference:", firstRawDifference);
+  console.log("local raw context:", JSON.stringify(localSvg.slice(Math.max(0, firstRawDifference - 80), firstRawDifference + 160)));
+  console.log("oracle raw context:", JSON.stringify(oracleSvg.slice(Math.max(0, firstRawDifference - 80), firstRawDifference + 160)));
+}
 const parsedEvents = parseJpsEvents(input);
 
 function attributes(tag) {
@@ -172,3 +180,59 @@ function beamRanges(svg, minimumY) {
 
 console.log("\nbeam ranges local:", beamRanges(localSvg, 1059).join(" "));
 console.log("beam ranges oracle:", beamRanges(oracleSvg, 1059).join(" "));
+const allLocalBeamRanges = beamRanges(localSvg, 0);
+const allOracleBeamRanges = beamRanges(oracleSvg, 0);
+console.log("beam ranges local-only:", allLocalBeamRanges.filter((range) => !allOracleBeamRanges.includes(range)).join(" "));
+console.log("beam ranges oracle-only:", allOracleBeamRanges.filter((range) => !allLocalBeamRanges.includes(range)).join(" "));
+
+function elementSignatures(svg) {
+  const body = svg.slice(svg.indexOf("</defs>") + 7);
+  return Array.from(body.matchAll(/<(use|line|path|text)\b[^>]*>/g), (match) => {
+    const attrs = attributes(match[0]);
+    return [match[1], attrs["xlink:href"], attrs.notepos, attrs.code, attrs["data-type"], attrs.cipos].filter(Boolean).join(":");
+  });
+}
+
+const localSignatures = elementSignatures(localSvg);
+const oracleSignatures = elementSignatures(oracleSvg);
+console.log(`\nelement signatures: local=${localSignatures.length} oracle=${oracleSignatures.length}`);
+for (let index = 0; index < Math.max(localSignatures.length, oracleSignatures.length); index += 1) {
+  if (localSignatures[index] !== oracleSignatures[index]) {
+    console.log(`first signature difference ${index}: local=${localSignatures[index]} oracle=${oracleSignatures[index]}`);
+    console.log("local signature window:", localSignatures.slice(Math.max(0, index - 5), index + 12).join(" | "));
+    console.log("oracle signature window:", oracleSignatures.slice(Math.max(0, index - 5), index + 12).join(" | "));
+    break;
+  }
+}
+const localOnlySignatures = localSignatures.filter((signature) => !oracleSignatures.includes(signature));
+const oracleOnlySignatures = oracleSignatures.filter((signature) => !localSignatures.includes(signature));
+console.log("element signatures local-only:", localOnlySignatures.join(" "));
+console.log("element signatures oracle-only:", oracleOnlySignatures.join(" "));
+const signatureCounts = (signatures) => signatures.reduce((counts, signature) => counts.set(signature, (counts.get(signature) ?? 0) + 1), new Map());
+const localSignatureCounts = signatureCounts(localSignatures);
+const oracleSignatureCounts = signatureCounts(oracleSignatures);
+console.log("element count differences:", Array.from(new Set([...localSignatures, ...oracleSignatures]))
+  .filter((signature) => localSignatureCounts.get(signature) !== oracleSignatureCounts.get(signature))
+  .map((signature) => `${signature}:local=${localSignatureCounts.get(signature) ?? 0},oracle=${oracleSignatureCounts.get(signature) ?? 0}`)
+  .join(" "));
+console.log("text signature indices local:", localSignatures.map((signature, index) => signature === "text" ? index : -1).filter((index) => index >= 0).join(" "));
+console.log("text signature indices oracle:", oracleSignatures.map((signature, index) => signature === "text" ? index : -1).filter((index) => index >= 0).join(" "));
+const noteUses = (svg) => Array.from(svg.matchAll(/<use\b[^>]*\bnotepos="[^"]+"[^>]*>/g), (match) => match[0]);
+const localNoteUses = noteUses(localSvg);
+const oracleNoteUses = noteUses(oracleSvg);
+const noteAttributeDifferences = [];
+for (let index = 0; index < Math.min(localNoteUses.length, oracleNoteUses.length); index += 1) {
+  const localAttributes = attributes(localNoteUses[index]);
+  const oracleAttributes = attributes(oracleNoteUses[index]);
+  for (const name of new Set([...Object.keys(localAttributes), ...Object.keys(oracleAttributes)])) {
+    if (localAttributes[name] !== oracleAttributes[name]) {
+      noteAttributeDifferences.push(`${index}:${name}:local=${localAttributes[name]},oracle=${oracleAttributes[name]}`);
+    }
+  }
+}
+console.log("note attribute differences:", noteAttributeDifferences.slice(0, 80).join(" | "));
+console.log("note attribute difference count:", noteAttributeDifferences.length);
+
+const glyphOrder = (svg) => Array.from(svg.matchAll(/<g id="([^"]+)"/g), (match) => match[1]);
+console.log("glyph order local:", glyphOrder(localSvg).join(" "));
+console.log("glyph order oracle:", glyphOrder(oracleSvg).join(" "));

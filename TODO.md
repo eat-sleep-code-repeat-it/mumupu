@@ -2,9 +2,9 @@
 
 ## Current Unsolved Renderer Issues
 
-- Finish parity for `public/jps-files/memory-from-cats.jps`; ordinary slurs, mixed-row beams, and long ties are implemented, but exact spacing still controls one path and five beam differences.
+- Finish parity for `public/jps-files/memory-from-cats.jps`; all 121 beams and 89 slur paths are present with matching beam source ranges, but exact natural-width coordinates still differ.
 - Reserve oracle-compatible horizontal space for bar-attached temporary meter changes.
-- Match spacing-dependent beam grouping, the remaining ordinary-slur path, and decoration definition/output ordering.
+- Match the remaining natural-width coordinates and decoration definition/output ordering.
 - Re-run `public/songs` parity after `memory-from-cats.jps` is clean, then cluster remaining failures by notation pattern.
 # TODO
 
@@ -101,8 +101,9 @@
 
 - [ ] Replace approximate regular-row spacing with the oracle's natural-width and justification model.
 - [ ] Reserve exact width for accidentals, octave marks, dots, annotations, slur boundaries, bars, and temporary meters.
-- [ ] Finish `memory-from-cats.jps`: one slur path and five beams remain spacing-dependent.
-- [ ] Derive beam grouping from beat boundaries plus `~`/`^` overrides.
+- [ ] Finish `memory-from-cats.jps`: beam/slur structure matches, but natural-width coordinates remain spacing-dependent.
+- [x] Derive mixed-row beam grouping from beat boundaries and notation boundaries present in current fixtures.
+- [ ] Add `~`/`^` beam grouping overrides.
 - [ ] Match glyph definition selection and ordering.
 - [ ] Match notation element layering and SVG number formatting.
 - [ ] Preserve byte-perfect grouped and simple fixtures throughout the layout rewrite.
