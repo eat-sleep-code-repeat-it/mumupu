@@ -232,6 +232,43 @@ for (let index = 0; index < Math.min(localNoteUses.length, oracleNoteUses.length
 }
 console.log("note attribute differences:", noteAttributeDifferences.slice(0, 80).join(" | "));
 console.log("note attribute difference count:", noteAttributeDifferences.length);
+console.log("opening note audio:", localNoteUses.slice(0, 80).map((tag, index) => {
+  const localAttributes = attributes(tag);
+  const oracleAttributes = attributes(oracleNoteUses[index]);
+  return `${index}:${localAttributes.notepos}:${localAttributes.code}:${localAttributes.audio}->${oracleAttributes.audio}`;
+}).join(" | "));
+console.log("remaining audio exceptions:", [294, 296].map((index) => {
+  const localAttributes = attributes(localNoteUses[index]);
+  const oracleAttributes = attributes(oracleNoteUses[index]);
+  return `${index}:${localAttributes.notepos}:${localAttributes.code}:${localAttributes.audio}->${oracleAttributes.audio}`;
+}).join(" | "));
+const renderedTags = (svg) => Array.from(svg.matchAll(/<(?:use|line|path|text)\b[^>]*>/g), (match) => match[0]);
+const localRenderedTags = renderedTags(localSvg);
+const oracleRenderedTags = renderedTags(oracleSvg);
+const renderedAttributeDifferences = [];
+for (let index = 0; index < Math.min(localRenderedTags.length, oracleRenderedTags.length); index += 1) {
+  const localAttributes = attributes(localRenderedTags[index]);
+  const oracleAttributes = attributes(oracleRenderedTags[index]);
+  for (const name of new Set([...Object.keys(localAttributes), ...Object.keys(oracleAttributes)])) {
+    if (localAttributes[name] !== oracleAttributes[name]) {
+      renderedAttributeDifferences.push(`${index}:${name}:local=${localAttributes[name]},oracle=${oracleAttributes[name]}`);
+    }
+  }
+}
+console.log("rendered attribute differences:", renderedAttributeDifferences.join(" | "));
+console.log("rendered attribute difference count:", renderedAttributeDifferences.length);
+const numericDifferencePairs = new Set();
+for (let index = 0; index < Math.min(localRenderedTags.length, oracleRenderedTags.length); index += 1) {
+  const localNumbers = localRenderedTags[index].match(/-?\d+(?:\.\d+)?/g) ?? [];
+  const oracleNumbers = oracleRenderedTags[index].match(/-?\d+(?:\.\d+)?/g) ?? [];
+  if (localNumbers.length !== oracleNumbers.length) continue;
+  localNumbers.forEach((value, numberIndex) => {
+    if (value !== oracleNumbers[numberIndex]) {
+      numericDifferencePairs.add(`${value}->${oracleNumbers[numberIndex]}`);
+    }
+  });
+}
+console.log("unique numeric differences:", Array.from(numericDifferencePairs).join(" "));
 
 const glyphOrder = (svg) => Array.from(svg.matchAll(/<g id="([^"]+)"/g), (match) => match[1]);
 console.log("glyph order local:", glyphOrder(localSvg).join(" "));

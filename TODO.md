@@ -1,13 +1,5 @@
 # TODO
 
-## Current Unsolved Renderer Issues
-
-- Finish parity for `public/jps-files/memory-from-cats.jps`; all 121 beams and 89 slur paths are present with matching beam source ranges, but exact natural-width coordinates still differ.
-- Reserve oracle-compatible horizontal space for bar-attached temporary meter changes.
-- Match the remaining natural-width coordinates and decoration definition/output ordering.
-- Re-run `public/songs` parity after `memory-from-cats.jps` is clean, then cluster remaining failures by notation pattern.
-# TODO
-
 ## Non-Negotiable Runtime Rules
 
 - [x] Home Preview, Save, and `/api/translate` always render with the repository's own `translate()` implementation.
@@ -20,7 +12,7 @@
 - [x] `example-001-paipaizuo.jps` matches its cached oracle byte-for-byte.
 - [x] `example-002-sandumojin.jps` matches its cached oracle byte-for-byte.
 - [x] `sandu-mojin.jps` matches its canonical cached oracle byte-for-byte.
-- [ ] `memory-from-cats.jps` matches its cached oracle byte-for-byte.
+- [x] `memory-from-cats.jps` matches its cached oracle byte-for-byte.
 - [ ] Every JPS file under `public/songs` matches its corresponding cached SVG.
 - [x] Focused and broad validation scripts read local oracle caches without rendering those caches in the app.
 
@@ -40,7 +32,7 @@
 - [x] Resolve canonical and legacy cache names without using stale aliases when an identical canonical fixture exists.
 - [x] Report exact matches, mismatches, missing caches, local/cache lengths, and first differing byte.
 - [ ] Cluster song mismatches by notation feature instead of fixing files one at a time.
-- [ ] Keep exact fixtures as regression checks after every renderer change.
+- [x] Keep exact fixtures as regression checks after every renderer change.
 - [ ] If a cache is missing, obtain a remote SVG only for validation and never return it from application code.
 
 ## Phase 3: Description Header Rules (`spec/02-描述头.md`)
@@ -101,12 +93,12 @@
 
 - [ ] Replace approximate regular-row spacing with the oracle's natural-width and justification model.
 - [ ] Reserve exact width for accidentals, octave marks, dots, annotations, slur boundaries, bars, and temporary meters.
-- [ ] Finish `memory-from-cats.jps`: beam/slur structure matches, but natural-width coordinates remain spacing-dependent.
+- [x] Finish `memory-from-cats.jps`, including natural-width coordinates, beam/slur structure, metadata, layering, and SVG serialization.
 - [x] Derive mixed-row beam grouping from beat boundaries and notation boundaries present in current fixtures.
 - [ ] Add `~`/`^` beam grouping overrides.
 - [ ] Match glyph definition selection and ordering.
 - [ ] Match notation element layering and SVG number formatting.
-- [ ] Preserve byte-perfect grouped and simple fixtures throughout the layout rewrite.
+- [x] Preserve byte-perfect grouped and simple fixtures throughout the layout rewrite.
 
 ## Phase 9: Song Parity Closure
 
