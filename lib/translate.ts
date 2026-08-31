@@ -216,6 +216,9 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     measureTime += event.time;
     ordinarySlurDepth += event.slurStartCount ?? 0;
     let width = 1 + event.time * 2;
+    if (!preserveRichBeatSpacing && event.durationMark.includes("//")) {
+      width += 0.5;
+    }
     if (
       !preserveRichBeatSpacing
       && !hasAscendingAccidentalRun
@@ -271,6 +274,14 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     }
     if (!preserveRichBeatSpacing && measureHasDottedSubdivision && event.slurEndCount) {
       width += 1;
+    }
+    if (
+      !preserveRichBeatSpacing
+      && event.slurEndCount
+      && !event.accidental
+      && previousEvent?.durationMark.includes("//")
+    ) {
+      width += 0.4;
     }
     const appliesAnnotationClearance = pendingAnnotationClearance
       && event.durationMark.includes("/")
@@ -345,6 +356,7 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     const sharesDescendingAccidentalSpace = !preserveRichBeatSpacing
       && ordinarySlurDepth > 0
       && Boolean(nextEvent?.accidental)
+      && !event.durationMark.includes("//")
       && (
         (
           nextEvent.octave < event.octave
@@ -369,6 +381,7 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && Number(previousEvent.pitch) - Number(event.pitch) === 1
       && !beforePreviousEvent?.accidental
       && !nextEvent?.accidental
+      && !event.accidental
       && !event.slurEndCount;
     if (followsDescendingFlat) {
       width += 0.4;
@@ -413,8 +426,9 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && nextEvent.durationMark.includes("/");
     const sharesDescendingFlatRun = event.accidental.includes("$")
       && nextEvent?.accidental.includes("$")
+      && ordinarySlurDepth > 0
       && event.octave === nextEvent.octave
-      && Number(event.pitch) - Number(nextEvent.pitch) > 1
+      && Number(event.pitch) > Number(nextEvent.pitch)
       && event.durationMark.includes("/")
       && nextEvent.durationMark.includes("/")
       && !previousEvent?.accidental
