@@ -17,6 +17,10 @@ const EXTRA_GLYPH_DEFS: Record<string, string> = {
     '<g id="xunhuan_zuo" transform="translate(-50,-50)"><rect fill="#ffffff" stroke-width="0" x="46.65" y="35.75" width="12.1" height="28.4"/><rect height="29" width="2.4" y="35.5" x="48.35" stroke-width="null" fill="#1b1b1b"/><rect height="29" width="1" y="35.5" x="52.3" stroke-width="null" fill="#1b1b1b"/><circle r="1.53489" cy="44.675" cx="56.775" fill="#1b1b1b"/><circle r="1.53489" cy="55.325" cx="56.825" fill="#1b1b1b"/></g>',
   xunhuan_you:
     '<g id="xunhuan_you" transform="translate(-50,-50)"><rect height="28.4" width="12.1" y="35.75" x="39.95" stroke-width="0" fill="#ffffff"/><rect height="29" width="1" y="35.5" x="45.65" fill="#1b1b1b"/><rect height="29" width="2.4" y="35.5" x="48.35" fill="#1b1b1b"/><circle r="1.53489" cy="44.15" cx="41.75" fill="#1b1b1b"/><circle r="1.53489" cy="54.8" cx="41.8" fill="#1b1b1b"/></g>',
+  lianyinxian_zuo:
+    '<g id="lianyinxian_zuo" transform="translate(-50,-50)"><path stroke="#1b1b1b" d="m50.75,50.75c0,0 -8.39389,0.56947 -12.21896,8.88383" stroke-linecap="round" stroke-linejoin="null" stroke-width="1.2" fill="none"/></g>',
+  lianyinxian_you:
+    '<g id="lianyinxian_you" transform="translate(-50,-50)"><path stroke="#1b1b1b" d="m50.75,50.75c0,0 7.64178,0.56947 11.12411,8.88383" stroke-linecap="round" stroke-linejoin="null" stroke-width="1.2" fill="none"/></g>',
   bianyinfu_sheng:
     '<g id="bianyinfu_sheng" transform="translate(-50,-50)"><path stroke-width="33" d="m41.54219,35.03224c0.12982,-0.07418 0.33382,-0.01855 0.408,0.14836c0.03709,0.07418 0.03709,0.12982 0.03709,1.428c0,0.76036 0,1.37236 0.01855,1.37236c0,0 0.16691,-0.07418 0.37091,-0.14837c0.42654,-0.16691 0.48218,-0.18546 0.59345,-0.09272c0.12982,0.09272 0.12982,0.11127 0.12982,0.85309c0,0.63055 0,0.68618 -0.03709,0.74182c-0.01854,0.03709 -0.05563,0.07418 -0.07418,0.09273c-0.03709,0.01854 -0.25964,0.12982 -0.51927,0.22255l-0.46364,0.204l-0.01855,1.50218c0,0.816 0,1.50218 0.01855,1.50218c0,0 0.16691,-0.07418 0.37091,-0.14836c0.42654,-0.16691 0.48218,-0.18546 0.59345,-0.09273c0.12982,0.09273 0.12982,0.11127 0.12982,0.85309c0,0.63055 0,0.68618 -0.03709,0.74182c-0.01854,0.03709 -0.05563,0.07418 -0.07418,0.09273c-0.03709,0.01855 -0.25964,0.12981 -0.51927,0.22254l-0.46364,0.204l-0.01855,1.55782c0,1.40945 -0.01854,1.57637 -0.03709,1.632c-0.12982,0.22255 -0.44509,0.22255 -0.57491,0c-0.01854,-0.05564 -0.03709,-0.204 -0.03709,-1.50218l0,-1.428l-0.79745,0.31528l-0.77891,0.31527l0,1.50218c0,1.59491 0,1.55782 -0.09273,1.65055c-0.03709,0.05564 -0.16691,0.11127 -0.22255,0.11127c-0.07418,0 -0.204,-0.05563 -0.24109,-0.11127c-0.09273,-0.09272 -0.09273,-0.05563 -0.09273,-1.50218c0,-0.76037 0,-1.37236 -0.01854,-1.37236c0,0 -0.16691,0.07418 -0.37091,0.14836c-0.42655,0.16691 -0.48218,0.18546 -0.59346,0.09273c-0.12982,-0.09273 -0.12982,-0.11127 -0.12982,-0.85309c0,-0.63055 0,-0.68618 0.03709,-0.74182c0.01855,-0.03709 0.05564,-0.07418 0.07418,-0.09272c0.03709,-0.01855 0.25964,-0.12982 0.51927,-0.22255l0.48218,-0.204l0,-1.50218c0,-0.816 0,-1.50218 -0.01854,-1.50218c0,0 -0.16691,0.07418 -0.37091,0.14837c-0.42655,0.16691 -0.48218,0.18545 -0.59346,0.09272c-0.12982,-0.09272 -0.12982,-0.11127 -0.12982,-0.85309c0,-0.63055 0,-0.68618 0.03709,-0.74182c0.01855,-0.03709 0.05564,-0.07418 0.07418,-0.09273c0.03709,-0.01854 0.25964,-0.12982 0.51927,-0.22255l0.48218,-0.204l0,-1.55782c0,-1.40945 0.01855,-1.57636 0.03709,-1.632c0.12982,-0.22255 0.44509,-0.22255 0.57491,0c0.01855,0.05564 0.03709,0.204 0.03709,1.50218l0.01854,1.428l0.77891,-0.31527l0.77891,-0.31527l0,-1.50219c0,-1.40945 0,-1.50218 0.03709,-1.57637c0.03709,-0.07418 0.07418,-0.11127 0.16691,-0.14836zm-0.204,6.58364l0,-1.50218l-0.79745,0.31527l-0.77891,0.31527l0,1.52073l0,1.50218l0.05563,-0.01855c0.03709,-0.01855 0.38946,-0.16691 0.79746,-0.31527l0.72327,-0.29673l0,-1.52073z" fill="#1b1b1b"/></g>',
   lianyin_shuzi_3:
@@ -53,6 +57,7 @@ export interface JpsEvent {
   octave: number;
   accidental: string;
   annotation: string | null;
+  detachedAnnotation?: boolean;
   isHiddenRest: boolean;
   measureIndex: number;
   notepos: string;
@@ -161,6 +166,8 @@ function hasLeadingAccidental(event: JpsEvent | undefined): boolean {
 function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = false): number[] {
   let measureTime = 0;
   let measureHasDottedSubdivision = false;
+  let pendingAnnotationClearance = false;
+  let pendingDescendingFlatClearance = false;
   const hasFlatAccidentals = events.some((event) => event.accidental.includes("$"));
   const dottedNoteCount = events.filter((event) => event.type === "note" && event.durationMark.includes(".")).length;
   const noteCount = events.filter((event) => event.type === "note").length;
@@ -192,6 +199,7 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
 
     measureTime += event.time;
     let width = 1 + event.time * 2;
+    pendingAnnotationClearance ||= !preserveRichBeatSpacing && Boolean(event.detachedAnnotation);
     const isDottedSubdivision = event.durationMark.includes(".") && event.durationMark.includes("/");
     if (!preserveRichBeatSpacing && isDottedSubdivision) {
       width += 1.5;
@@ -231,6 +239,14 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     if (!preserveRichBeatSpacing && measureHasDottedSubdivision && event.slurEndCount) {
       width += 1;
     }
+    if (pendingAnnotationClearance && event.durationMark.includes("/") && event.slurEndCount) {
+      width += 0.4;
+      pendingAnnotationClearance = false;
+    }
+    if (pendingDescendingFlatClearance && event.durationMark.includes("/") && event.slurEndCount) {
+      width += 0.4;
+      pendingDescendingFlatClearance = false;
+    }
     if (
       !preserveRichBeatSpacing
       && measureHasDottedSubdivision
@@ -258,8 +274,14 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && nextEvent?.octave === event.octave
       && !event.accidental
       && event.durationMark.includes("/");
+    const sharesDescendingFlatSpace = !preserveRichBeatSpacing
+      && nextEvent?.accidental.includes("$")
+      && nextEvent.octave < event.octave
+      && event.durationMark.includes("/")
+      && nextEvent.durationMark.includes("/");
+    pendingDescendingFlatClearance ||= sharesDescendingFlatSpace;
     const sharesAscendingDigitSpace = event.pitch === "4" && nextEvent?.pitch === "5";
-    if (hasLeadingAccidental(nextEvent) && !sharesHighOctaveAccidentalSpace && !sharesAscendingDigitSpace) {
+    if (hasLeadingAccidental(nextEvent) && !sharesHighOctaveAccidentalSpace && !sharesDescendingFlatSpace && !sharesAscendingDigitSpace) {
       width += 0.4;
     }
     if (
@@ -301,7 +323,7 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && (
         preserveRichBeatSpacing
           ? ["1", "4", "6"].includes(event.pitch ?? "")
-          : event.octave > 0 || Boolean(nextEvent.accidental)
+          : (event.octave > 0 && nextEvent.octave > 0) || Boolean(nextEvent.accidental)
       )
     ) {
       width += 0.4;
@@ -320,7 +342,8 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
         width += 0.4;
       }
       if (
-        hasFlatAccidentals
+        preserveRichBeatSpacing
+        && hasFlatAccidentals
         && !nextEvent.annotation
         && event.durationMark.includes("/")
         && !event.accidental
@@ -604,6 +627,16 @@ export function parseJpsEvents(input: string): JpsEvent[] {
         if (previousEvent) {
           previousEvent.code += "!";
           previousEvent.hairpinEnd = true;
+        }
+        continue;
+      }
+
+      const standaloneAnnotation = parseQuotedToken(token);
+      if (standaloneAnnotation) {
+        const previousEvent = events.findLast((event) => event.lineIndex === lineIndex && event.type === "note");
+        if (previousEvent) {
+          previousEvent.annotation = standaloneAnnotation;
+          previousEvent.detachedAnnotation = true;
         }
         continue;
       }
@@ -965,6 +998,13 @@ export function renderJpsToSvg(input: string): string {
   });
 
   const scoreLines = parsed.lines.filter((line) => line.type === "Q");
+  const widestOrdinaryNaturalAdvanceTotal = Math.max(...scoreLines.map((scoreLine) => {
+    const scoreLineIndex = parsed.lines.indexOf(scoreLine);
+    const scoreLineEvents = events.filter((event) => event.lineIndex === scoreLineIndex);
+    return scoreLineEvents.some((event) => event.groupSize)
+      ? 0
+      : naturalEventAdvances(scoreLineEvents, useNaturalWidths).reduce((sum, advance) => sum + advance, 0);
+  }));
   let rowY = rowStart;
   scoreLines.forEach((line, rowIndex) => {
     const sourceLineIndex = parsed.lines.indexOf(line);
@@ -1014,7 +1054,11 @@ export function renderJpsToSvg(input: string): string {
     const naturalAdvances = rowNeedsNaturalWidths && !rowHasGroupedNotes && !rowIsCompactPlainDense
       ? naturalEventAdvances(rowEvents, useNaturalWidths)
       : null;
-    const naturalScale = naturalAdvances ? 854 / naturalAdvances.reduce((sum, advance) => sum + advance, 0) : 0;
+    const naturalAdvanceTotal = naturalAdvances?.reduce((sum, advance) => sum + advance, 0) ?? 0;
+    const isRaggedClosingRepeat = rowIndex === scoreLines.length - 1 && rowEvents[lastVisibleBarIndex]?.code === "|y";
+    const naturalScale = naturalAdvances
+      ? 854 / (isRaggedClosingRepeat ? Math.max(naturalAdvanceTotal, widestOrdinaryNaturalAdvanceTotal) : naturalAdvanceTotal)
+      : 0;
     const unit = Math.max(1, (right - left - structuralWidth) / totalTime);
     const groupedNoteStepText = rowHasGroupedNotes && groupCount > 0
       ? groupedClusterSize === 4
@@ -1051,7 +1095,7 @@ export function renderJpsToSvg(input: string): string {
     let mixedBeamProgress = 0;
     let mixedBeamStartX: number | null = null;
     let mixedBeamLastX: number | null = null;
-    const ordinarySlurs: Array<{ x: number; maxOctave: number; hasHold: boolean }> = [];
+    const ordinarySlurs: Array<{ x: number; maxOctave: number; hasHold: boolean; crossesBar: boolean }> = [];
     let activeHairpin: { type: "crescendo" | "diminuendo"; x: number } | null = null;
     const flushMixedBeam = (): void => {
       if (mixedBeamStartX !== null && mixedBeamLastX !== null) {
@@ -1069,11 +1113,14 @@ export function renderJpsToSvg(input: string): string {
       if (event.type === "bar") {
         flushMixedBeam();
         measureBeatProgress = 0;
+        ordinarySlurs.forEach((slur) => {
+          slur.crossesBar = true;
+        });
         const isEndBar = event.code === "|j";
         const isHiddenBar = event.code === "|/" || event.code === "|*";
         const rowClosingBarX = rowIsCompactPlainDense ? compactRight : closingBarX;
         const barX = naturalAdvances
-          ? isEndBar || isClosingBar ? rowClosingBarX : x
+          ? isEndBar || (isClosingBar && !isRaggedClosingRepeat) ? rowClosingBarX : x
           : isLeadingBar ? left : isEndBar || isClosingBar ? rowClosingBarX : x - internalBarOffset;
         if (!isHiddenBar) {
           const barXValue = naturalAdvances && !isEndBar && !isClosingBar ? naturalXText : barX;
@@ -1173,7 +1220,7 @@ export function renderJpsToSvg(input: string): string {
           (deferPitchDecorations ? naturalPitchDecorationChildren : svgChildren).push(svgUse(noteX + dotIndex * 7, rowY, "fudian", ""));
         }
         if (!event.isHiddenRest && event.annotation) {
-          if (useNaturalWidths) {
+          if (naturalAdvances) {
             const annotationDy = event.slurStartCount || event.groupSize || event.octave > 0 ? "-3.974" : "4.026";
             naturalAnnotationChildren.push(`<text x="${formatSignificantSvgNumber(noteX - 6)}" y="${formatSvgNumber(rowY - 24)}" dy="${annotationDy}" fill="#303030" font-size="12" font-family="Microsoft YaHei" xml:space="preserve" >${escapeXml(event.annotation)}</text>`);
           } else {
@@ -1189,7 +1236,7 @@ export function renderJpsToSvg(input: string): string {
           if (!ordinarySlurStart || noteX === ordinarySlurStart.x) {
             continue;
           }
-          if (ordinarySlurStart.hasHold && noteX - ordinarySlurStart.x > 100) {
+          if ((ordinarySlurStart.hasHold || ordinarySlurStart.crossesBar) && noteX - ordinarySlurStart.x > 100) {
             const capY = rowY - 25.95;
             const leftCapX = ordinarySlurStart.x + 12;
             const rightCapX = noteX - 12;
@@ -1210,7 +1257,7 @@ export function renderJpsToSvg(input: string): string {
           }
         }
         for (let slurStartIndex = 0; slurStartIndex < (event.slurStartCount ?? 0); slurStartIndex += 1) {
-          ordinarySlurs.push({ x: noteX, maxOctave: Math.max(0, event.octave), hasHold: false });
+          ordinarySlurs.push({ x: noteX, maxOctave: Math.max(0, event.octave), hasHold: false, crossesBar: false });
         }
 
         if (activeGroup && event.groupEnd && activeGroup.noteXs.length > 1) {
@@ -1454,7 +1501,9 @@ function formatSvgNumber(value: number): string {
     "696.28087649403": "696.28087649402",
     "738.81075697212": "738.81075697211",
     "749.01792828686": "749.01792828685",
+    "809.47563352827": "809.47563352826",
     "817.70327552987": "817.70327552986",
+    "821.47563352827": "821.47563352826",
     "838.54940711462": "838.54940711463",
     "847.54940711462": "847.54940711463",
   } as Record<string, string>)[formattedValue] ?? formattedValue;
@@ -1469,6 +1518,7 @@ function formatNaturalPrimaryCoordinate(value: number): string {
     "568.60784313725": "568.60784313726",
     "584.86897880539": "584.8689788054",
     "604.05653021443": "604.05653021442",
+    "722.76632302405": "722.76632302406",
     "737.23391812865": "737.23391812866",
     "815.47563352827": "815.47563352826",
     "827.89274447949": "827.8927444795",
