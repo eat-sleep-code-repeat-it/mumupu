@@ -194,6 +194,7 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     if (event.type === "bar") {
       measureTime = 0;
       measureHasDottedSubdivision = false;
+      pendingNestedSlurClearance = false;
       if (eventIndex === events.length - 1) {
         const previousEvent = events[eventIndex - 1];
         if (preserveRichBeatSpacing && previousEvent?.durationMark.includes("/")) {
@@ -241,6 +242,14 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     const beforePreviousEvent = events[eventIndex - 2];
     const afterNextEvent = events[eventIndex + 2];
     const thirdNextEvent = events[eventIndex + 3];
+    if (
+      !preserveRichBeatSpacing
+      && isDottedSubdivision
+      && event.slurStartCount
+      && previousEvent?.slurEndCount
+    ) {
+      width -= 2;
+    }
     const nextStartsRestoredFlatTail = nextEvent?.accidental.includes("=")
       && afterNextEvent?.accidental.includes("$")
       && thirdNextEvent?.accidental.includes("$");
@@ -269,10 +278,18 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     if (isolatesEighth) {
       width += 1 + (event.accidental && (!nextContinuesBeam || (preserveRichBeatSpacing && isShortAccidentalTail) || preservesShortAccidentalTail) ? 0.4 : 0);
     }
-    if (event.slurEndCount && event.octave > 0 && event.accidental) {
+    if (
+      event.slurEndCount
+      && event.octave > 0
+      && event.accidental
+      && (
+        !previousEvent?.accidental
+        || (previousEvent.pitch === event.pitch && previousEvent.octave === event.octave)
+      )
+    ) {
       width += 0.4;
     }
-    if (!preserveRichBeatSpacing && measureHasDottedSubdivision && event.slurEndCount) {
+    if (!preserveRichBeatSpacing && measureHasDottedSubdivision && event.slurEndCount && !event.accidental) {
       width += 1;
     }
     if (
@@ -280,6 +297,16 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && event.slurEndCount
       && !event.accidental
       && previousEvent?.durationMark.includes("//")
+    ) {
+      width += 0.4;
+    }
+    if (
+      !preserveRichBeatSpacing
+      && event.slurEndCount
+      && !event.accidental
+      && previousEvent?.accidental.includes("$")
+      && previousEvent.slurStartCount
+      && nextEvent?.time === 1
     ) {
       width += 0.4;
     }
@@ -372,18 +399,41 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && event.durationMark.includes("/")
       && nextEvent.durationMark.includes("/");
     pendingDescendingAccidentalClearance ||= sharesDescendingAccidentalSpace;
+    const descendsToClosingRestore = sharesDescendingAccidentalSpace
+      && Boolean(nextEvent?.accidental.includes("="))
+      && Boolean(nextEvent?.slurEndCount);
     const followsDescendingFlat = !preserveRichBeatSpacing
       && ordinarySlurDepth > 0
       && previousEvent?.accidental.includes("$")
       && previousEvent.durationMark.includes("/")
+      && (!previousEvent.durationMark.includes("//") || event.durationMark.includes("//"))
       && event.durationMark.includes("/")
       && previousEvent.octave === event.octave
       && Number(previousEvent.pitch) - Number(event.pitch) === 1
       && !beforePreviousEvent?.accidental
       && !nextEvent?.accidental
+      && !nextEvent?.slurStartCount
       && !event.accidental
-      && !event.slurEndCount;
+      && !event.slurEndCount
+      && !(
+        !event.durationMark.includes("//")
+        && nextEvent?.octave === event.octave
+        && Number(event.pitch) - Number(nextEvent.pitch) === 1
+      );
     if (followsDescendingFlat) {
+      width += 0.4;
+    }
+    const carriesSixteenthFlatDescent = !preserveRichBeatSpacing
+      && ordinarySlurDepth > 0
+      && event.accidental.includes("$")
+      && event.durationMark.includes("//")
+      && !event.slurEndCount
+      && nextEvent?.type === "note"
+      && !nextEvent.accidental
+      && nextEvent.durationMark.includes("/")
+      && !nextEvent.durationMark.includes("//")
+      && Number(nextEvent.pitch) < Number(event.pitch);
+    if (carriesSixteenthFlatDescent) {
       width += 0.4;
     }
     const sharesAscendingDigitSpace = event.pitch === "4" && nextEvent?.pitch === "5";
@@ -428,7 +478,10 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && nextEvent?.accidental.includes("$")
       && ordinarySlurDepth > 0
       && event.octave === nextEvent.octave
-      && Number(event.pitch) > Number(nextEvent.pitch)
+      && (
+        Number(event.pitch) - Number(nextEvent.pitch) > 1
+        || (Number(event.pitch) - Number(nextEvent.pitch) === 1 && !nextEvent.slurEndCount)
+      )
       && event.durationMark.includes("/")
       && nextEvent.durationMark.includes("/")
       && !previousEvent?.accidental
@@ -451,7 +504,23 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     ) {
       width += 0.4;
     }
-    if (hasLeadingAccidental(nextEvent) && !sharesHighOctaveAccidentalSpace && !sharesDescendingAccidentalSpace && !sharesAscendingDigitSpace && !carriesDottedAscendingAccidentalSpace && !continuesAscendingAccidentalRun && !startsRestoredFlatTail && !continuesRestoredFlatTail && !sharesDescendingFlatRun) {
+    const repeatsNestedOpenFlat = (event.slurStartCount ?? 0) >= 2
+      && Boolean(event.accidental)
+      && nextEvent?.pitch === event.pitch
+      && nextEvent.octave === event.octave
+      && nextEvent.accidental === event.accidental;
+    const opensAfterFlatSlurClose = Boolean(event.slurStartCount)
+      && previousEvent?.accidental.includes("$")
+      && Boolean(previousEvent.slurEndCount)
+      && nextEvent?.type === "note"
+      && !nextEvent.accidental
+      && nextEvent.octave === event.octave
+      && Number(nextEvent.pitch) > Number(event.pitch)
+      && afterNextEvent?.accidental.includes("$");
+    if (hasLeadingAccidental(nextEvent) && !sharesHighOctaveAccidentalSpace && (!sharesDescendingAccidentalSpace || descendsToClosingRestore) && !sharesAscendingDigitSpace && !carriesDottedAscendingAccidentalSpace && !continuesAscendingAccidentalRun && !startsRestoredFlatTail && !continuesRestoredFlatTail && !sharesDescendingFlatRun && !repeatsNestedOpenFlat) {
+      width += 0.4;
+    }
+    if (opensAfterFlatSlurClose) {
       width += 0.4;
     }
     if (
@@ -481,7 +550,27 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     ) {
       width += 0.4;
     }
-    if (event.pitch === "6" && event.durationMark.includes("/") && event.accidental.includes("$") && event.slurStartCount && nextEvent?.pitch === "6") {
+    if (
+      event.pitch === "6"
+      && event.durationMark.includes("/")
+      && event.accidental.includes("$")
+      && event.slurStartCount
+      && ordinarySlurDepth === event.slurStartCount
+      && nextEvent?.pitch === "6"
+    ) {
+      width += 0.4;
+    }
+    if (
+      !preserveRichBeatSpacing
+      && event.slurStartCount
+      && !event.accidental
+      && nextEvent?.pitch === event.pitch
+      && nextEvent.octave === event.octave
+      && (
+        (previousEvent?.slurEndCount ?? 0) > 1
+        || ordinarySlurDepth > event.slurStartCount
+      )
+    ) {
       width += 0.4;
     }
     if (
@@ -498,12 +587,28 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     ) {
       width += 0.4;
     }
+    if (
+      isBeatBoundary
+      && Boolean(event.slurStartCount)
+      && Boolean(previousEvent?.slurEndCount)
+      && previousEvent?.accidental.includes("$")
+      && !event.accidental
+      && event.durationMark.includes("/")
+      && nextEvent?.type === "note"
+      && !nextEvent.accidental
+      && nextEvent.durationMark.includes("/")
+      && nextEvent.octave === event.octave
+      && Number(event.pitch) - Number(nextEvent.pitch) === 1
+      && afterNextEvent?.accidental.includes("$")
+    ) {
+      width += 0.4;
+    }
     if (nextEvent?.type === "bar") {
       width -= 0.2;
       if (previousEvent?.accidental.includes("=") && event.accidental.includes("$")) {
         width += 0.4;
       }
-      if (!preserveRichBeatSpacing && event.type !== "hold" && hasSlashDurations && ordinarySlurDepth > (event.slurEndCount ?? 0)) {
+      if (!preserveRichBeatSpacing && event.type !== "hold" && event.time < 1 && hasSlashDurations && ordinarySlurDepth > (event.slurEndCount ?? 0)) {
         width += 0.4;
       }
       if (
@@ -532,6 +637,7 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     if (
       pendingNestedSlurClearance
       && Boolean(event.slurEndCount)
+      && Boolean(previousEvent?.slurEndCount)
       && ordinarySlurDepth === event.slurEndCount
     ) {
       width += 0.4;
@@ -1336,16 +1442,28 @@ export function renderJpsToSvg(input: string): string {
     let mixedBeamProgress = 0;
     let mixedBeamStartX: number | null = null;
     let mixedBeamLastX: number | null = null;
-    const ordinarySlurs: Array<{ x: number; maxOctave: number; hasHold: boolean; crossesBar: boolean; depth: number }> = [];
+    let mixedSecondaryBeamStartX: number | null = null;
+    let mixedSecondaryBeamLastX: number | null = null;
+    const mixedSecondaryBeamSegments: Array<{ startX: number; lastX: number }> = [];
+    const ordinarySlurs: Array<{ x: number; maxOctave: number; hasHold: boolean; crossesBar: boolean; depth: number; hasNestedChild: boolean; deferredChildren: string[] }> = [];
     let activeHairpin: { type: "crescendo" | "diminuendo"; x: number } | null = null;
     let activeJumpHouse: { x: number; label: string } | null = null;
     const flushMixedBeam = (): void => {
+      if (mixedSecondaryBeamStartX !== null && mixedSecondaryBeamLastX !== null) {
+        mixedSecondaryBeamSegments.push({ startX: mixedSecondaryBeamStartX, lastX: mixedSecondaryBeamLastX });
+      }
       if (mixedBeamStartX !== null && mixedBeamLastX !== null) {
         durationLineChildren.push(slashBeamLine(mixedBeamStartX - 6, rowY + 13, mixedBeamLastX + 6));
+        mixedSecondaryBeamSegments.forEach((segment) => {
+          durationLineChildren.push(slashBeamLine(segment.startX - 6, rowY + 16, segment.lastX + 6));
+        });
       }
       mixedBeamProgress = 0;
       mixedBeamStartX = null;
       mixedBeamLastX = null;
+      mixedSecondaryBeamStartX = null;
+      mixedSecondaryBeamLastX = null;
+      mixedSecondaryBeamSegments.length = 0;
     };
 
     rowEvents.forEach((event, eventIndex) => {
@@ -1492,13 +1610,17 @@ export function renderJpsToSvg(input: string): string {
           if (!ordinarySlurStart || noteX === ordinarySlurStart.x) {
             continue;
           }
-          if ((ordinarySlurStart.hasHold || ordinarySlurStart.crossesBar) && noteX - ordinarySlurStart.x > 100) {
-            const capY = rowY - 25.95 - ordinarySlurStart.depth * 4;
+          const slurChildren: string[] = [];
+          if (noteX - ordinarySlurStart.x > 100) {
+            const capOctaveOffset = ordinarySlurStart.maxOctave === 0
+              ? 0
+              : 5 + (ordinarySlurStart.maxOctave - 1) * 8;
+            const capY = rowY - 25.95 - capOctaveOffset - (ordinarySlurStart.depth + (ordinarySlurStart.hasNestedChild ? 1 : 0)) * 4;
             const leftCapX = ordinarySlurStart.x + 12;
             const rightCapX = noteX - 12;
-            groupedDecorationChildren.push(svgUse(leftCapX, capY, "lianyinxian_zuo", ""));
-            groupedDecorationChildren.push(svgUse(rightCapX, capY, "lianyinxian_you", ""));
-            groupedDecorationChildren.push(`<line x1="${formatSvgNumber(leftCapX + 0.8)}" y1="${formatSvgNumber(capY + 0.75)}" x2="${formatSvgNumber(rightCapX + 1)}" y2="${formatSvgNumber(capY + 0.75)}" stroke-width="1.2" stroke="#1b1b1b" fill="none" ></line>`);
+            slurChildren.push(svgUse(leftCapX, capY, "lianyinxian_zuo", ""));
+            slurChildren.push(svgUse(rightCapX, capY, "lianyinxian_you", ""));
+            slurChildren.push(`<line x1="${formatSvgNumber(leftCapX + 0.8)}" y1="${formatSvgNumber(capY + 0.75)}" x2="${formatSvgNumber(rightCapX + 1)}" y2="${formatSvgNumber(capY + 0.75)}" stroke-width="1.2" stroke="#1b1b1b" fill="none" ></line>`);
           } else {
             const slurOctaveOffset = ordinarySlurStart.maxOctave === 0
               ? 16
@@ -1509,8 +1631,22 @@ export function renderJpsToSvg(input: string): string {
             const controlInset = (noteX - ordinarySlurStart.x) * 0.3;
             const leftControlX = ordinarySlurStart.x + controlInset;
             const rightControlX = noteX - controlInset;
-            groupedDecorationChildren.push(`<path d="M ${formatSvgNumber(slurStartX)},${formatSvgNumber(slurY)} C ${formatSvgNumber(leftControlX)},${formatSvgNumber(slurY - 10)},${formatSvgNumber(rightControlX)},${formatSvgNumber(slurY - 10)},${formatSvgNumber(slurEndX)},${formatSvgNumber(slurY)} M ${formatSvgNumber(slurEndX)},${formatSvgNumber(slurY)} C  ${formatSvgNumber(rightControlX)},${formatSvgNumber(slurY - 9)},${formatSvgNumber(leftControlX)},${formatSvgNumber(slurY - 9)},${formatSvgNumber(slurStartX)},${formatSvgNumber(slurY)}" stroke-width="0.5" stroke="#1b1b1b" ></path>`);
+            slurChildren.push(`<path d="M ${formatSvgNumber(slurStartX)},${formatSvgNumber(slurY)} C ${formatSvgNumber(leftControlX)},${formatSvgNumber(slurY - 10)},${formatSvgNumber(rightControlX)},${formatSvgNumber(slurY - 10)},${formatSvgNumber(slurEndX)},${formatSvgNumber(slurY)} M ${formatSvgNumber(slurEndX)},${formatSvgNumber(slurY)} C  ${formatSvgNumber(rightControlX)},${formatSvgNumber(slurY - 9)},${formatSvgNumber(leftControlX)},${formatSvgNumber(slurY - 9)},${formatSvgNumber(slurStartX)},${formatSvgNumber(slurY)}" stroke-width="0.5" stroke="#1b1b1b" ></path>`);
           }
+          slurChildren.push(...ordinarySlurStart.deferredChildren);
+          const parentSlur = ordinarySlurs[ordinarySlurs.length - 1];
+          if (parentSlur && ordinarySlurStart.x > parentSlur.x) {
+            parentSlur.deferredChildren.push(...slurChildren);
+          } else {
+            groupedDecorationChildren.push(...slurChildren);
+          }
+        }
+        if (event.slurStartCount) {
+          ordinarySlurs.forEach((slur) => {
+            if (slur.depth === 0) {
+              slur.hasNestedChild = true;
+            }
+          });
         }
         for (let slurStartIndex = 0; slurStartIndex < (event.slurStartCount ?? 0); slurStartIndex += 1) {
           ordinarySlurs.push({
@@ -1519,6 +1655,8 @@ export function renderJpsToSvg(input: string): string {
             hasHold: false,
             crossesBar: false,
             depth: (event.slurStartCount ?? 0) - slurStartIndex - 1,
+            hasNestedChild: false,
+            deferredChildren: [],
           });
         }
 
@@ -1609,16 +1747,18 @@ export function renderJpsToSvg(input: string): string {
       }
 
       if (!rowHasGroupedNotes && event.type === "note" && event.durationMark.includes("/")) {
-        const isOrdinaryDottedSlash = !useNaturalWidths && event.durationMark.includes(".");
+        const previousEvent = rowEvents[eventIndex - 1];
+        const beforePreviousEvent = rowEvents[eventIndex - 2];
+        const nextEvent = rowEvents[eventIndex + 1];
+        const isOrdinaryDottedSlash = !useNaturalWidths
+          && event.durationMark.includes(".")
+          && !(event.slurStartCount && previousEvent?.slurEndCount);
         if (isOrdinaryDottedSlash) {
           flushMixedBeam();
         }
         if (useNaturalWidths && event.pitch === null) {
           flushMixedBeam();
         }
-        const previousEvent = rowEvents[eventIndex - 1];
-        const beforePreviousEvent = rowEvents[eventIndex - 2];
-        const nextEvent = rowEvents[eventIndex + 1];
         const splitShortAccidentalTail = useMeasureBeatBeams
           && nextEvent?.type === "bar"
           && event.accidental
@@ -1632,6 +1772,14 @@ export function renderJpsToSvg(input: string): string {
         }
         mixedBeamStartX ??= lastNoteX;
         mixedBeamLastX = lastNoteX;
+        if (event.durationMark.includes("//")) {
+          mixedSecondaryBeamStartX ??= lastNoteX;
+          mixedSecondaryBeamLastX = lastNoteX;
+        } else if (mixedSecondaryBeamStartX !== null && mixedSecondaryBeamLastX !== null) {
+          mixedSecondaryBeamSegments.push({ startX: mixedSecondaryBeamStartX, lastX: mixedSecondaryBeamLastX });
+          mixedSecondaryBeamStartX = null;
+          mixedSecondaryBeamLastX = null;
+        }
         measureBeatProgress += event.time;
         mixedBeamProgress += event.time;
         const beamProgress = useMeasureBeatBeams ? measureBeatProgress : mixedBeamProgress;
