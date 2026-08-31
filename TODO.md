@@ -84,7 +84,7 @@
 
 - [x] Basic Chinese lyric-to-note alignment and punctuation handling.
 - [x] Skip marker `@`, joined characters `~`, underscore spaces, and English `/` separators.
-- [ ] Render multiple `C:` lines attached to one `Q:` line.
+- [x] Render multiple `C:` lines attached to one `Q:` line.
 - [ ] Render lyric annotations before lyric text with underscore-to-space conversion.
 - [ ] Validate mixed Chinese/English alignment across song fixtures.
 - [ ] Validate that holds do not consume lyric units.
@@ -108,7 +108,7 @@
 - [ ] Reach byte-for-byte equality for every song with a corresponding cached SVG.
 - [ ] Document any spec ambiguity that cannot be inferred from the text or cached fixtures.
 
-Current verified baseline: 38 songs checked, 1 exact, 37 mismatched, and 0 missing caches. The exact song fixture is `sandu-mojin.jps` through its canonical content-identical cache.
+Current verified baseline: 38 songs checked, 3 exact, 35 mismatched, and 0 missing caches. The exact song fixtures are `sandu-mojin.jps` through its canonical content-identical cache, `baihualin.jps`, and `Londonderry.jps`.
 
 ## Active Order
 
