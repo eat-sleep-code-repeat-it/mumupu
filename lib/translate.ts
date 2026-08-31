@@ -238,6 +238,9 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     const beforePreviousEvent = events[eventIndex - 2];
     const afterNextEvent = events[eventIndex + 2];
     const thirdNextEvent = events[eventIndex + 3];
+    const nextStartsRestoredFlatTail = nextEvent?.accidental.includes("=")
+      && afterNextEvent?.accidental.includes("$")
+      && thirdNextEvent?.accidental.includes("$");
     const isShortAccidentalTail = event.type === "note"
       && event.durationMark.includes("/")
       && event.accidental
@@ -343,13 +346,33 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && ordinarySlurDepth > 0
       && Boolean(nextEvent?.accidental)
       && (
-        nextEvent.octave < event.octave
-        || (nextEvent.octave === event.octave && Number(nextEvent.pitch) < Number(event.pitch))
+        (
+          nextEvent.octave < event.octave
+          && !(event.octave > 0 && nextEvent.accidental.includes("$"))
+        )
+        || (
+          nextEvent.octave === event.octave
+          && Number(nextEvent.pitch) < Number(event.pitch)
+          && !nextEvent.accidental.includes("$")
+          && !nextStartsRestoredFlatTail
+        )
       )
       && event.durationMark.includes("/")
       && nextEvent.durationMark.includes("/");
-    const duplicatesHighOctaveDescendingClearance = sharesDescendingAccidentalSpace && event.octave > 0;
     pendingDescendingAccidentalClearance ||= sharesDescendingAccidentalSpace;
+    const followsDescendingFlat = !preserveRichBeatSpacing
+      && ordinarySlurDepth > 0
+      && previousEvent?.accidental.includes("$")
+      && previousEvent.durationMark.includes("/")
+      && event.durationMark.includes("/")
+      && previousEvent.octave === event.octave
+      && Number(previousEvent.pitch) - Number(event.pitch) === 1
+      && !beforePreviousEvent?.accidental
+      && !nextEvent?.accidental
+      && !event.slurEndCount;
+    if (followsDescendingFlat) {
+      width += 0.4;
+    }
     const sharesAscendingDigitSpace = event.pitch === "4" && nextEvent?.pitch === "5";
     const anticipatesAscendingAccidentalRun = !preserveRichBeatSpacing
       && isBeatBoundary
@@ -376,6 +399,32 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && Boolean(nextEvent?.accidental)
       && Number(previousEvent?.pitch) < Number(event.pitch)
       && Number(event.pitch) < Number(nextEvent?.pitch);
+    const startsRestoredFlatTail = event.accidental.includes("=")
+      && nextEvent?.accidental.includes("$")
+      && afterNextEvent?.accidental.includes("$")
+      && event.durationMark.includes("/")
+      && nextEvent.durationMark.includes("/")
+      && afterNextEvent.durationMark.includes("/");
+    const continuesRestoredFlatTail = previousEvent?.accidental.includes("=")
+      && event.accidental.includes("$")
+      && nextEvent?.accidental.includes("$")
+      && previousEvent.durationMark.includes("/")
+      && event.durationMark.includes("/")
+      && nextEvent.durationMark.includes("/");
+    const sharesDescendingFlatRun = event.accidental.includes("$")
+      && nextEvent?.accidental.includes("$")
+      && event.octave === nextEvent.octave
+      && Number(event.pitch) - Number(nextEvent.pitch) > 1
+      && event.durationMark.includes("/")
+      && nextEvent.durationMark.includes("/")
+      && !previousEvent?.accidental
+      && !afterNextEvent?.accidental;
+    const endsRestoredFlatTail = beforePreviousEvent?.accidental.includes("=")
+      && previousEvent?.accidental.includes("$")
+      && event.accidental.includes("$")
+      && beforePreviousEvent.durationMark.includes("/")
+      && previousEvent.durationMark.includes("/")
+      && event.durationMark.includes("/");
     if (
       !preserveRichBeatSpacing
       && previousEvent?.pitch === "4"
@@ -388,7 +437,7 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     ) {
       width += 0.4;
     }
-    if (hasLeadingAccidental(nextEvent) && !sharesHighOctaveAccidentalSpace && (!sharesDescendingAccidentalSpace || duplicatesHighOctaveDescendingClearance) && !sharesAscendingDigitSpace && !carriesDottedAscendingAccidentalSpace && !continuesAscendingAccidentalRun) {
+    if (hasLeadingAccidental(nextEvent) && !sharesHighOctaveAccidentalSpace && !sharesDescendingAccidentalSpace && !sharesAscendingDigitSpace && !carriesDottedAscendingAccidentalSpace && !continuesAscendingAccidentalRun && !startsRestoredFlatTail && !continuesRestoredFlatTail && !sharesDescendingFlatRun) {
       width += 0.4;
     }
     if (
@@ -437,6 +486,9 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     }
     if (nextEvent?.type === "bar") {
       width -= 0.2;
+      if (previousEvent?.accidental.includes("=") && event.accidental.includes("$")) {
+        width += 0.4;
+      }
       if (!preserveRichBeatSpacing && event.type !== "hold" && hasSlashDurations && ordinarySlurDepth > (event.slurEndCount ?? 0)) {
         width += 0.4;
       }
@@ -446,7 +498,7 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
         && (
           (preserveRichBeatSpacing && event.octave > 0)
           || (event.pitch === "7" && event.accidental.includes("$") && !event.slurEndCount)
-          || (event.pitch === "6" && event.accidental.includes("$") && !nextEvent.annotation)
+          || (event.pitch === "6" && event.accidental.includes("$") && !nextEvent.annotation && !endsRestoredFlatTail)
         )
       ) {
         width += 0.4;
@@ -1131,7 +1183,11 @@ export function renderJpsToSvg(input: string): string {
   }
 
   const timeSignatures = (parsed.header.P ?? "").split(",").map((value) => value.trim()).filter(Boolean);
-  const timeSignatureKeyOffset = parsed.header.D && keySignatureParts(parsed.header.D).accidental ? 5 : 0;
+  const timeSignatureKeyOffset = timeSignatures.length === 1
+    && parsed.header.D
+    && keySignatureParts(parsed.header.D).accidental
+    ? 5
+    : 0;
   timeSignatures.forEach((signature, index) => {
     const [numerator, denominator] = signature.split("/");
     const signatureX = (timeSignatures.length === 3 ? 145 + index * 27 : 140 + index * 32) + timeSignatureKeyOffset;
