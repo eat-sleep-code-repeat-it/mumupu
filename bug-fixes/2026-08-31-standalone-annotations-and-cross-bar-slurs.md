@@ -28,5 +28,5 @@ Date: 2026-08-31
 - The focused exact-fixture suite remains 4 exact, 0 mismatched, and 0 missing caches.
 - The song inventory remains 5 exact, 33 mismatched, and 0 missing caches.
 - `hejiayi-F-Swan-lake-alternativekeys.jps` now advances past its former definition-block mismatch; its remaining first difference is an accidental-clearance allocation within row one.
-- `hejiayi-F-Swan-lake.jps` now matches through rows one and two; its remaining first difference is row-three natural-width geometry.
+- `hejiayi-F-Swan-lake.jps` advanced through its annotation, cross-bar slur, and natural-width mismatches before the jump-house fix completed fixture parity.
 - `pnpm exec tsc --noEmit` completes without diagnostics.

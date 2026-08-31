@@ -70,6 +70,8 @@ export interface JpsEvent {
   hairpinStart?: "crescendo" | "diminuendo";
   hairpinEnd?: boolean;
   dynamicMark?: string;
+  jumpHouseStartLabel?: string;
+  jumpHouseEnd?: boolean;
 }
 
 export interface JpsNote {
@@ -167,7 +169,8 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
   let measureTime = 0;
   let measureHasDottedSubdivision = false;
   let pendingAnnotationClearance = false;
-  let pendingDescendingFlatClearance = false;
+  let pendingDescendingAccidentalClearance = false;
+  let ordinarySlurDepth = 0;
   const hasFlatAccidentals = events.some((event) => event.accidental.includes("$"));
   const dottedNoteCount = events.filter((event) => event.type === "note" && event.durationMark.includes(".")).length;
   const noteCount = events.filter((event) => event.type === "note").length;
@@ -198,6 +201,7 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     }
 
     measureTime += event.time;
+    ordinarySlurDepth += event.slurStartCount ?? 0;
     let width = 1 + event.time * 2;
     pendingAnnotationClearance ||= !preserveRichBeatSpacing && Boolean(event.detachedAnnotation);
     const isDottedSubdivision = event.durationMark.includes(".") && event.durationMark.includes("/");
@@ -239,13 +243,30 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     if (!preserveRichBeatSpacing && measureHasDottedSubdivision && event.slurEndCount) {
       width += 1;
     }
-    if (pendingAnnotationClearance && event.durationMark.includes("/") && event.slurEndCount) {
+    const appliesAnnotationClearance = pendingAnnotationClearance
+      && event.durationMark.includes("/")
+      && Boolean(event.slurEndCount);
+    if (appliesAnnotationClearance) {
       width += 0.4;
       pendingAnnotationClearance = false;
     }
-    if (pendingDescendingFlatClearance && event.durationMark.includes("/") && event.slurEndCount) {
+    const appliesDescendingAccidentalClearance = pendingDescendingAccidentalClearance
+      && event.durationMark.includes("/")
+      && Boolean(event.slurEndCount);
+    if (appliesDescendingAccidentalClearance) {
       width += 0.4;
-      pendingDescendingFlatClearance = false;
+      pendingDescendingAccidentalClearance = false;
+    }
+    if (
+      !preserveRichBeatSpacing
+      && event.durationMark.includes("/")
+      && event.slurEndCount
+      && previousEvent?.accidental
+      && nextEvent?.type === "bar"
+      && !appliesAnnotationClearance
+      && !appliesDescendingAccidentalClearance
+    ) {
+      width += 0.4;
     }
     if (
       !preserveRichBeatSpacing
@@ -274,14 +295,18 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && nextEvent?.octave === event.octave
       && !event.accidental
       && event.durationMark.includes("/");
-    const sharesDescendingFlatSpace = !preserveRichBeatSpacing
-      && nextEvent?.accidental.includes("$")
-      && nextEvent.octave < event.octave
+    const sharesDescendingAccidentalSpace = !preserveRichBeatSpacing
+      && ordinarySlurDepth > 0
+      && Boolean(nextEvent?.accidental)
+      && (
+        nextEvent.octave < event.octave
+        || (nextEvent.octave === event.octave && Number(nextEvent.pitch) < Number(event.pitch))
+      )
       && event.durationMark.includes("/")
       && nextEvent.durationMark.includes("/");
-    pendingDescendingFlatClearance ||= sharesDescendingFlatSpace;
+    pendingDescendingAccidentalClearance ||= sharesDescendingAccidentalSpace;
     const sharesAscendingDigitSpace = event.pitch === "4" && nextEvent?.pitch === "5";
-    if (hasLeadingAccidental(nextEvent) && !sharesHighOctaveAccidentalSpace && !sharesDescendingFlatSpace && !sharesAscendingDigitSpace) {
+    if (hasLeadingAccidental(nextEvent) && !sharesHighOctaveAccidentalSpace && !sharesDescendingAccidentalSpace && !sharesAscendingDigitSpace) {
       width += 0.4;
     }
     if (
@@ -330,12 +355,15 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     }
     if (nextEvent?.type === "bar") {
       width -= 0.2;
+      if (!preserveRichBeatSpacing && ordinarySlurDepth > (event.slurEndCount ?? 0)) {
+        width += 0.4;
+      }
       if (
         useMeasureBeatSpacing
         && event.durationMark.includes("/")
         && (
           (preserveRichBeatSpacing && event.octave > 0)
-          || (event.pitch === "7" && event.accidental.includes("$"))
+          || (event.pitch === "7" && event.accidental.includes("$") && !event.slurEndCount)
           || (event.pitch === "6" && event.accidental.includes("$") && !nextEvent.annotation)
         )
       ) {
@@ -353,6 +381,7 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
         width += 0.4;
       }
     }
+    ordinarySlurDepth -= event.slurEndCount ?? 0;
     return width;
   });
 }
@@ -512,6 +541,7 @@ export function parseJpsEvents(input: string): JpsEvent[] {
     if (line.type !== "Q") return;
 
     let eventIndex = 0;
+    let pendingJumpHouseEndCode: string | null = null;
     const groupStack: Array<{ size: number; isTuplet: boolean; startsOnNextNote: boolean; startPitch: string | null; hasPitchChange: boolean }> = [];
 
     const countGroupNotes = (startTokenIndex: number): number => {
@@ -548,10 +578,15 @@ export function parseJpsEvents(input: string): JpsEvent[] {
         const isFinalDoubleBar = token === "|" && nextToken === "|" && tokenIndex + 1 === line.tokens.length - 1;
         const annotationToken = isFinalDoubleBar ? null : parseQuotedToken(nextToken ?? "");
         const annotation = annotationToken?.startsWith("p:") ? annotationToken : null;
+        const jumpHouseEndCode = pendingJumpHouseEndCode;
+        pendingJumpHouseEndCode = null;
         events.push({
           ...createJpsEvent("bar", isFinalDoubleBar ? "|j" : token, melodyLineIndex, eventIndex, measureIndex, lineIndex),
-          code: isFinalDoubleBar ? "|j" : token === "|:" ? "|z" : token === ":|" ? "|y" : annotation ? `${token}'${annotation}'` : token,
+          code: jumpHouseEndCode
+            ? `${jumpHouseEndCode}]${token}`
+            : isFinalDoubleBar ? "|j" : token === "|:" ? "|z" : token === ":|" ? "|y" : annotation ? `${token}'${annotation}'` : token,
           annotation,
+          jumpHouseEnd: Boolean(jumpHouseEndCode),
         });
         measureIndex += 1;
         eventIndex += 1;
@@ -559,6 +594,27 @@ export function parseJpsEvents(input: string): JpsEvent[] {
           tokenIndex += 1;
         } else if (annotation) {
           tokenIndex += 1;
+        }
+        continue;
+      }
+
+      if (token === "[") {
+        const label = parseQuotedToken(line.tokens[tokenIndex + 1] ?? "");
+        const previousBar = events.at(-1);
+        if (label && previousBar?.type === "bar" && previousBar.lineIndex === lineIndex) {
+          previousBar.code = `${previousBar.code}['${label}'`;
+          previousBar.jumpHouseStartLabel = label;
+          tokenIndex += 1;
+        }
+        continue;
+      }
+
+      if (token === "]" && line.tokens[tokenIndex + 1] === "|") {
+        const previousEvent = events.at(-1);
+        if (previousEvent?.type === "note" && previousEvent.lineIndex === lineIndex) {
+          pendingJumpHouseEndCode = previousEvent.code;
+          events.pop();
+          eventIndex -= 1;
         }
         continue;
       }
@@ -581,13 +637,21 @@ export function parseJpsEvents(input: string): JpsEvent[] {
         const group = groupStack.pop();
         const lastEvent = events.at(-1);
         if (group && lastEvent && lastEvent.lineIndex === lineIndex && lastEvent.type === "note") {
+          const previousNote = events.findLast((event, eventIndex) => eventIndex < events.length - 1 && event.lineIndex === lineIndex && event.type === "note");
           lastEvent.code = `${lastEvent.code})`;
           if (group.isTuplet) {
             lastEvent.groupEnd = true;
             lastEvent.groupSize = group.size;
           } else {
             lastEvent.slurEndCount = (lastEvent.slurEndCount ?? 0) + 1;
-            if (lastEvent.pitch === group.startPitch && !group.hasPitchChange) {
+            if (
+              (lastEvent.pitch === group.startPitch && !group.hasPitchChange)
+              || (
+                previousNote?.pitch === lastEvent.pitch
+                && Boolean(previousNote.accidental)
+                && !lastEvent.accidental
+              )
+            ) {
               lastEvent.audio = "0";
             }
           }
@@ -958,6 +1022,7 @@ export function renderJpsToSvg(input: string): string {
   const groupedDecorationChildren: string[] = [];
   const expressionChildren: string[] = [];
   const dynamicChildren: string[] = [];
+  const jumpHouseChildren: string[] = [];
 
   const subtitle = secondaryTitle(parsed);
   if (subtitle) {
@@ -1009,6 +1074,10 @@ export function renderJpsToSvg(input: string): string {
   scoreLines.forEach((line, rowIndex) => {
     const sourceLineIndex = parsed.lines.indexOf(line);
     const rowEvents = events.filter((event) => event.lineIndex === sourceLineIndex);
+    const rowHasJumpHouse = rowEvents.some((event) => event.jumpHouseStartLabel);
+    if (rowHasJumpHouse) {
+      rowY += 12;
+    }
     const lyricLines: JpsLine[] = [];
     for (let lyricLineIndex = sourceLineIndex + 1; parsed.lines[lyricLineIndex]?.type === "C"; lyricLineIndex += 1) {
       lyricLines.push(parsed.lines[lyricLineIndex]);
@@ -1049,6 +1118,7 @@ export function renderJpsToSvg(input: string): string {
     const deferPitchDecorations = useNaturalWidths || (!rowHasGroupedNotes && !rowIsCompactPlainDense);
     const rowNeedsNaturalWidths = useNaturalWidths
       || lyricLines.length > 1
+      || rowHasJumpHouse
       || rowEvents.some((event) => event.code === "|z" || event.code === "|y")
       || rowEvents.some((event) => event.type === "note" && /[/.]/.test(event.durationMark));
     const naturalAdvances = rowNeedsNaturalWidths && !rowHasGroupedNotes && !rowIsCompactPlainDense
@@ -1097,6 +1167,7 @@ export function renderJpsToSvg(input: string): string {
     let mixedBeamLastX: number | null = null;
     const ordinarySlurs: Array<{ x: number; maxOctave: number; hasHold: boolean; crossesBar: boolean }> = [];
     let activeHairpin: { type: "crescendo" | "diminuendo"; x: number } | null = null;
+    let activeJumpHouse: { x: number; label: string } | null = null;
     const flushMixedBeam = (): void => {
       if (mixedBeamStartX !== null && mixedBeamLastX !== null) {
         durationLineChildren.push(slashBeamLine(mixedBeamStartX - 6, rowY + 13, mixedBeamLastX + 6));
@@ -1126,6 +1197,20 @@ export function renderJpsToSvg(input: string): string {
           const barXValue = naturalAdvances && !isEndBar && !isClosingBar ? naturalXText : barX;
           const barGlyph = event.code === "|z" ? "xunhuan_zuo" : event.code === "|y" ? "xunhuan_you" : isEndBar ? "jieshufu" : "xiaojiexian";
           svgChildren.push(svgUse(barXValue, rowY, barGlyph, ` notepos="${event.notepos}" time="0" audio="" code="${escapeXmlAttribute(event.code)}"`));
+          const numericBarX = typeof barXValue === "string" ? Number(barXValue) : barXValue;
+          if (event.jumpHouseStartLabel) {
+            activeJumpHouse = { x: numericBarX + 2, label: event.jumpHouseStartLabel };
+          }
+          if (event.jumpHouseEnd && activeJumpHouse) {
+            const endX = numericBarX - 2;
+            const topY = rowY - 30;
+            const bottomY = rowY - 20;
+            jumpHouseChildren.push(`<line x1="${formatSvgNumber(activeJumpHouse.x)}" y1="${formatSvgNumber(bottomY)}" x2="${formatSvgNumber(activeJumpHouse.x)}" y2="${formatSvgNumber(topY)}" stroke-width="1" stroke="#1b1b1b" fill="none" ></line>`);
+            jumpHouseChildren.push(`<line x1="${formatSvgNumber(activeJumpHouse.x)}" y1="${formatSvgNumber(topY)}" x2="${formatSvgNumber(endX)}" y2="${formatSvgNumber(topY)}" stroke-width="1" stroke="#1b1b1b" fill="none" ></line>`);
+            jumpHouseChildren.push(`<line x1="${formatSvgNumber(endX)}" y1="${formatSvgNumber(bottomY)}" x2="${formatSvgNumber(endX)}" y2="${formatSvgNumber(topY)}" stroke-width="1" stroke="#1b1b1b" fill="none" ></line>`);
+            jumpHouseChildren.push(`<text x="${formatSvgNumber(activeJumpHouse.x + 3)}" y="${formatSvgNumber(bottomY)}" dy="4.026" fill="#303030" font-size="12" font-family="Microsoft YaHei" xml:space="preserve" >${escapeXml(activeJumpHouse.label)}</text>`);
+            activeJumpHouse = null;
+          }
         }
         if (event.annotation?.startsWith("p:")) {
           pushTemporaryMeter(svgChildren, naturalAdvances ? formatSignificantSvgNumber(rawNaturalX + naturalScale * 2) : barX + 11, rowY, event.annotation);
@@ -1401,7 +1486,7 @@ export function renderJpsToSvg(input: string): string {
 
     rowY += 78 + lyricLines.length * 28;
   });
-  const outputChildren = [...svgChildren, ...durationLineChildren, ...naturalPitchDecorationChildren, ...octaveGlyphChildren, ...groupedDecorationChildren, ...expressionChildren, ...dynamicChildren, ...naturalAnnotationChildren];
+  const outputChildren = [...svgChildren, ...durationLineChildren, ...naturalPitchDecorationChildren, ...octaveGlyphChildren, ...groupedDecorationChildren, ...expressionChildren, ...dynamicChildren, ...naturalAnnotationChildren, ...jumpHouseChildren];
   const usedGlyphIds = Array.from(new Set(Array.from(outputChildren.join("\n").matchAll(/xlink:href="#([^"]+)"/g)).map((match) => match[1])));
 
   return `<svg width="${width}" height="${height}" version="1.1" viewBox="${viewBox}" encoding="UTF-8" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" height="100%" width="100%" fill="#ffffff" />${defaultGlyphDefs(usedGlyphIds)}\n${outputChildren.join("\n")}

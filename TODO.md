@@ -108,7 +108,7 @@
 - [ ] Reach byte-for-byte equality for every song with a corresponding cached SVG.
 - [ ] Document any spec ambiguity that cannot be inferred from the text or cached fixtures.
 
-Current verified baseline: 38 songs checked, 5 exact, 33 mismatched, and 0 missing caches. The exact song fixtures are `sandu-mojin.jps` through its canonical content-identical cache, `baihualin.jps`, `Londonderry.jps`, `LondonderryAir.jps`, and `always-zhoushen.jps`.
+Current verified baseline: 38 songs checked, 6 exact, 32 mismatched, and 0 missing caches. The exact song fixtures are `sandu-mojin.jps` through its canonical content-identical cache, `baihualin.jps`, `Londonderry.jps`, `LondonderryAir.jps`, `always-zhoushen.jps`, and `hejiayi-F-Swan-lake.jps`.
 
 ## Active Order
 
