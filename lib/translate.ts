@@ -758,9 +758,9 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && nextEvent?.accidental.includes("#")
       && nextEvent.octave === event.octave
       && Number(nextEvent.pitch) < Number(event.pitch);
-    const startsFixedDoLowDescendingSharpSlur = usesFixedDoRounding
+    const startsFixedDoNonHighDescendingSharpSlur = usesFixedDoRounding
       && hasExpressionMarks
-      && event.octave < 0
+      && event.octave <= 0
       && event.durationMark.includes("/")
       && Boolean(event.slurStartCount)
       && event.accidental.includes("#")
@@ -768,6 +768,14 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && nextEvent.accidental.includes("#")
       && nextEvent.octave === event.octave
       && Number(nextEvent.pitch) < Number(event.pitch);
+    const startsFixedDoCrossOctaveSharpSlur = usesFixedDoRounding
+      && event.octave >= 0
+      && event.durationMark.includes("/")
+      && Boolean(event.slurStartCount)
+      && event.accidental.includes("#")
+      && nextEvent?.durationMark.includes("/")
+      && !nextEvent.accidental
+      && nextEvent.octave > event.octave;
     const precedesDescendingSharpSlur = Boolean(nextEvent?.slurStartCount)
       && !event.accidental
       && nextEvent.accidental.includes("#")
@@ -853,7 +861,8 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && !nextEvent.accidental
       && nextEvent.durationMark.includes("/")
       && nextEvent.octave === event.octave
-      && Number(previousEvent.pitch) > Number(event.pitch);
+      && Number(previousEvent.pitch) > Number(event.pitch)
+      && !afterNextEvent?.accidental;
     if (hasLeadingAccidental(nextEvent) && !sharesHighOctaveAccidentalSpace && (!sharesDescendingAccidentalSpace || descendsToClosingRestore) && !sharesAscendingDigitSpace && !carriesDottedAscendingAccidentalSpace && !continuesAscendingAccidentalRun && !startsRestoredFlatTail && !continuesRestoredFlatTail && !sharesDescendingFlatRun && !repeatsNestedOpenFlat && !repeatsClosingAccidental && !closesNestedRepeatedNote && !startsDescendingSharpSlur && !precedesDescendingSharpSlur && !precedesFixedDoCrossOctaveSharpSlur && !closesBeforeDescendingSharp && !closesBeforeSamePitchSharpOpener && !wholeLowOctaveSamePitchSharpOpener) {
       width += 0.4;
     }
@@ -889,7 +898,10 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     if (opensAfterDescendingSharpSlurClose) {
       width += 0.4;
     }
-    if (startsFixedDoLowDescendingSharpSlur) {
+    if (startsFixedDoNonHighDescendingSharpSlur) {
+      width += 0.4;
+    }
+    if (startsFixedDoCrossOctaveSharpSlur) {
       width += 0.4;
     }
     if (eighthLowOctaveSamePitchSharpOpener) {
@@ -1100,6 +1112,20 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
         && previousEvent.octave === event.octave
         && previousEvent.pitch === event.pitch
         && beforePreviousEvent?.pitch !== event.pitch
+      ) {
+        width += 0.4;
+      }
+      if (
+        usesFixedDoRounding
+        && event.octave > 0
+        && event.durationMark.includes("/")
+        && event.accidental.includes("#")
+        && Boolean(event.slurEndCount)
+        && previousEvent?.type === "note"
+        && !previousEvent.accidental
+        && previousEvent.pitch === event.pitch
+        && previousEvent.octave === event.octave
+        && Boolean(previousEvent.slurStartCount)
       ) {
         width += 0.4;
       }
@@ -2566,6 +2592,9 @@ function formatSvgNumber(value: number): string {
     "401.69061876247": "401.69061876248",
     "402.69061876247": "402.69061876248",
     "413.69061876247": "413.69061876248",
+    "415.94346978557": "415.94346978558",
+    "403.94346978557": "403.94346978558",
+    "404.94346978557": "404.94346978558",
     "398.33365539452": "398.33365539453",
     "506.68553459119": "506.6855345912",
     "511.17630853995": "511.17630853994",
@@ -2622,6 +2651,7 @@ function formatNaturalPrimaryCoordinate(value: number, usesFixedDoRounding = fal
   return ({
     "192.13184584178": "192.13184584179",
     "413.69061876247": "413.69061876248",
+    "415.94346978557": "415.94346978558",
     "448.00204498977": "448.00204498978",
     "470.87914230019": "470.8791423002",
     "483.80368098159": "483.8036809816",
