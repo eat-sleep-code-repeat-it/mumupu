@@ -190,6 +190,15 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
   const dottedNoteCount = events.filter((event) => event.type === "note" && event.durationMark.includes(".")).length;
   const noteCount = events.filter((event) => event.type === "note").length;
   const useMeasureBeatSpacing = dottedNoteCount > 1 || (dottedNoteCount > 0 && noteCount <= 24);
+  const lowDottedMixedMeasureIndexes = new Set(events
+    .filter((event, eventIndex) => event.type === "note"
+      && event.octave < 0
+      && event.code.includes(".")
+      && !event.durationMark.includes("/")
+      && !event.slurStartCount
+      && events[eventIndex - 1]?.type === "bar"
+      && events.some((candidate) => candidate.measureIndex === event.measureIndex && candidate.durationMark.includes("//")))
+    .map((event) => event.measureIndex));
 
   return events.map((event, eventIndex) => {
     const nextEvent = events[eventIndex + 1];
@@ -233,17 +242,27 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     pendingAnnotationClearance ||= !preserveRichBeatSpacing && Boolean(event.detachedAnnotation);
     const isDottedSubdivision = event.durationMark.includes(".") && event.durationMark.includes("/");
     if (!preserveRichBeatSpacing && isDottedSubdivision) {
-      width += 1.5;
+      width += nextEvent?.durationMark.includes("//") && !event.slurStartCount ? 0.5 : 1.5;
       measureHasDottedSubdivision = true;
     }
+    const usesLowDottedMixedSpacing = lowDottedMixedMeasureIndexes.has(event.measureIndex);
     const isBeatBoundary = event.time < 1 && Math.abs(measureTime - Math.round(measureTime)) < 1e-9;
-    if (isBeatBoundary) {
+    if (isBeatBoundary && (!usesLowDottedMixedSpacing || nextEvent?.type === "bar") && !(isDottedSubdivision && nextEvent?.type === "bar")) {
       width += 1;
     }
     const previousEvent = events[eventIndex - 1];
     const beforePreviousEvent = events[eventIndex - 2];
     const afterNextEvent = events[eventIndex + 2];
     const thirdNextEvent = events[eventIndex + 3];
+    if (
+      usesLowDottedMixedSpacing
+      && (
+        (previousEvent?.code.includes(".") && !previousEvent.durationMark.includes("/"))
+        || (event.durationMark.includes("/") && !event.durationMark.includes("//") && nextEvent?.durationMark.includes("//"))
+      )
+    ) {
+      width += 1;
+    }
     if (
       !preserveRichBeatSpacing
       && isDottedSubdivision
@@ -298,6 +317,7 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       !preserveRichBeatSpacing
       && event.slurEndCount
       && previousEvent?.durationMark.includes("//")
+      && (previousEvent.pitch !== event.pitch || event.accidental.includes("#"))
       && (!event.accidental || event.accidental.includes("#"))
     ) {
       width += 0.4;
@@ -363,6 +383,7 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && previousEvent?.pitch === nextEvent?.pitch
       && previousEvent?.durationMark.includes("/")
       && !previousEvent.slurStartCount
+      && !previousEvent.durationMark.includes(".")
       && nextEvent?.durationMark.includes("/")
     ) {
       width += 1;
@@ -1083,6 +1104,27 @@ export function parseJpsEvents(input: string): JpsEvent[] {
         continue;
       }
 
+      if (token === "]" && line.tokens[tokenIndex + 1] === "[") {
+        const label = parseQuotedToken(line.tokens[tokenIndex + 2] ?? "");
+        const previousBar = events.at(-1);
+        if (label && previousBar?.type === "bar" && previousBar.lineIndex === lineIndex) {
+          previousBar.code = `${previousBar.code}]['${label}'`;
+          previousBar.jumpHouseEnd = true;
+          previousBar.jumpHouseStartLabel = label;
+          tokenIndex += 2;
+        }
+        continue;
+      }
+
+      if (token === "]") {
+        const previousBar = events.at(-1);
+        if (previousBar?.type === "bar" && previousBar.lineIndex === lineIndex) {
+          previousBar.code = `${previousBar.code}]`;
+          previousBar.jumpHouseEnd = true;
+          continue;
+        }
+      }
+
       if (token === "]" && line.tokens[tokenIndex + 1] === "|") {
         const previousEvent = events.at(-1);
         if (previousEvent?.type === "note" && previousEvent.lineIndex === lineIndex) {
@@ -1198,7 +1240,7 @@ export function parseJpsEvents(input: string): JpsEvent[] {
       const isDynamic = parsedToken.annotation?.startsWith("p:") ?? false;
       const activeTuplet = groupStack.findLast((group) => group.isTuplet);
       const decorationCode = `${parsedToken.dynamicMark ? `+${parsedToken.dynamicMark}` : ""}${parsedToken.hairpinEnd ? "!" : ""}`;
-      const normalizedCode = `${parsedToken.rawValue}${parsedToken.pitchSuffix}${parsedToken.durationMark}${decorationCode}`;
+      const normalizedCode = `${parsedToken.notationCode}${decorationCode}`;
       const isGroupedNote = !isDynamic && Boolean(activeTuplet);
       const isGroupStart = isGroupedNote && token.startsWith("y") && token.length > 1;
       const slurStartCount = isDynamic ? 0 : groupStack.filter((group) => !group.isTuplet && group.startsOnNextNote).length;
@@ -1217,7 +1259,7 @@ export function parseJpsEvents(input: string): JpsEvent[] {
         code: isGroupStart
           ? groupedStartCode(parsedToken.rawValue, parsedToken.pitchSuffix, parsedToken.durationMark, decorationCode)
           : slurStartCount > 0
-            ? `${parsedToken.rawValue}${"(".repeat(slurStartCount)}${parsedToken.pitchSuffix}${parsedToken.durationMark}${decorationCode}`
+            ? `${parsedToken.rawValue}${"(".repeat(slurStartCount)}${parsedToken.notationCode.slice(parsedToken.rawValue.length)}${decorationCode}`
             : normalizedCode,
         pitch: isDynamic || parsedToken.isRest ? null : parsedToken.rawValue,
         audio: parsedToken.isRest ? "0" : parsedToken.audioValue,
@@ -1319,6 +1361,7 @@ function parseJpsTokenParts(token: string): {
   hairpinStart: "crescendo" | "diminuendo" | undefined;
   hairpinEnd: boolean;
   dynamicMark: string | undefined;
+  notationCode: string;
 } {
   const normalizedToken = token.startsWith("y") && token.length > 1 ? token.slice(1) : token;
   const { baseToken, annotation } = extractTokenAnnotation(normalizedToken);
@@ -1333,9 +1376,8 @@ function parseJpsTokenParts(token: string): {
   const accidentalMatch = notationToken.match(/^(\d+)(.*)$/);
   const rawValue = accidentalMatch ? accidentalMatch[1] : notationToken;
   const restOfToken = accidentalMatch ? accidentalMatch[2] : "";
-  const durationMatch = restOfToken.match(/([-/.]+)$/);
-  const durationMark = durationMatch ? durationMatch[1] : "";
-  const pitchSuffix = durationMatch ? restOfToken.slice(0, -durationMark.length) : restOfToken;
+  const durationMark = Array.from(restOfToken).filter((char) => char === "-" || char === "/" || char === ".").join("");
+  const pitchSuffix = restOfToken.replace(/[-/.]/g, "");
   const { accidental, octavePart } = parsePitchTail(pitchSuffix);
 
   return {
@@ -1350,6 +1392,7 @@ function parseJpsTokenParts(token: string): {
     hairpinStart,
     hairpinEnd,
     dynamicMark,
+    notationCode: notationToken,
   };
 }
 
@@ -1565,18 +1608,20 @@ export function renderJpsToSvg(input: string): string {
   const scoreLines = parsed.lines.filter((line) => line.type === "Q");
   const firstScoreLineIndex = scoreLines[0] ? parsed.lines.indexOf(scoreLines[0]) : -1;
   const rowStart = (hasTempo ? 266 : 236) + (expressionLineIndexes.has(firstScoreLineIndex) ? 12 : 0);
-  const widestOrdinaryNaturalAdvanceTotal = Math.max(...scoreLines.map((scoreLine) => {
+  const ordinaryNaturalAdvanceTotals = scoreLines.map((scoreLine) => {
     const scoreLineIndex = parsed.lines.indexOf(scoreLine);
     const scoreLineEvents = events.filter((event) => event.lineIndex === scoreLineIndex);
     return scoreLineEvents.some((event) => event.groupSize)
       ? 0
       : naturalEventAdvances(scoreLineEvents, useNaturalWidths).reduce((sum, advance) => sum + advance, 0);
-  }));
+  });
+  const widestOrdinaryNaturalAdvanceTotal = Math.max(...ordinaryNaturalAdvanceTotals);
   let rowY = rowStart;
   scoreLines.forEach((line, rowIndex) => {
     const sourceLineIndex = parsed.lines.indexOf(line);
     const rowEvents = events.filter((event) => event.lineIndex === sourceLineIndex);
     const rowHasJumpHouse = rowEvents.some((event) => event.jumpHouseStartLabel);
+    const rowHasAccidentals = rowEvents.some((event) => Boolean(event.accidental));
     if (rowHasJumpHouse) {
       rowY += 12;
     }
@@ -1631,9 +1676,20 @@ export function renderJpsToSvg(input: string): string {
       ? naturalEventAdvances(rowEvents, useNaturalWidths)
       : null;
     const naturalAdvanceTotal = naturalAdvances?.reduce((sum, advance) => sum + advance, 0) ?? 0;
+    const previousNaturalAdvanceTotal = ordinaryNaturalAdvanceTotals[rowIndex - 1] ?? naturalAdvanceTotal;
     const isRaggedClosingRepeat = rowIndex === scoreLines.length - 1 && rowEvents[lastVisibleBarIndex]?.code === "|y";
+    const isRaggedClosingDoubleBar = rowIndex === scoreLines.length - 1
+      && rowEvents[lastVisibleBarIndex]?.code === "|j"
+      && naturalAdvanceTotal * 2 < previousNaturalAdvanceTotal;
+    const isRaggedClosingRow = isRaggedClosingRepeat || isRaggedClosingDoubleBar;
     const naturalScale = naturalAdvances
-      ? 854 / (isRaggedClosingRepeat ? Math.max(naturalAdvanceTotal, widestOrdinaryNaturalAdvanceTotal) : naturalAdvanceTotal)
+      ? 854 / (
+        isRaggedClosingRepeat
+          ? Math.max(naturalAdvanceTotal, widestOrdinaryNaturalAdvanceTotal)
+          : isRaggedClosingDoubleBar
+            ? previousNaturalAdvanceTotal
+            : naturalAdvanceTotal
+      )
       : 0;
     const unit = Math.max(1, (right - left - structuralWidth) / totalTime);
     const groupedNoteStepText = rowHasGroupedNotes && groupCount > 0
@@ -1675,6 +1731,7 @@ export function renderJpsToSvg(input: string): string {
     let mixedBeamProgress = 0;
     let mixedBeamStartX: number | null = null;
     let mixedBeamLastX: number | null = null;
+    let mixedBeamEndExtension = 6;
     let mixedSecondaryBeamStartX: number | null = null;
     let mixedSecondaryBeamLastX: number | null = null;
     const mixedSecondaryBeamSegments: Array<{ startX: number; lastX: number }> = [];
@@ -1686,7 +1743,7 @@ export function renderJpsToSvg(input: string): string {
         mixedSecondaryBeamSegments.push({ startX: mixedSecondaryBeamStartX, lastX: mixedSecondaryBeamLastX });
       }
       if (mixedBeamStartX !== null && mixedBeamLastX !== null) {
-        durationLineChildren.push(slashBeamLine(mixedBeamStartX - 6, rowY + 13, mixedBeamLastX + 6));
+        durationLineChildren.push(slashBeamLine(mixedBeamStartX - 6, rowY + 13, mixedBeamLastX + mixedBeamEndExtension));
         mixedSecondaryBeamSegments.forEach((segment) => {
           durationLineChildren.push(slashBeamLine(segment.startX - 6, rowY + 16, segment.lastX + 6));
         });
@@ -1694,6 +1751,7 @@ export function renderJpsToSvg(input: string): string {
       mixedBeamProgress = 0;
       mixedBeamStartX = null;
       mixedBeamLastX = null;
+      mixedBeamEndExtension = 6;
       mixedSecondaryBeamStartX = null;
       mixedSecondaryBeamLastX = null;
       mixedSecondaryBeamSegments.length = 0;
@@ -1726,16 +1784,13 @@ export function renderJpsToSvg(input: string): string {
         const isHiddenBar = event.code === "|/" || event.code === "|*";
         const rowClosingBarX = rowIsCompactPlainDense ? compactRight : closingBarX;
         const barX = naturalAdvances
-          ? isEndBar || (isClosingBar && !isRaggedClosingRepeat) ? rowClosingBarX : x
+          ? (isEndBar && !isRaggedClosingRow) || (isClosingBar && !isRaggedClosingRow) ? rowClosingBarX : x
           : isLeadingBar ? left : isEndBar || isClosingBar ? rowClosingBarX : x - internalBarOffset;
         if (!isHiddenBar) {
           const barXValue = naturalAdvances && !isEndBar && !isClosingBar ? naturalXText : barX;
           const barGlyph = event.code === "|z" ? "xunhuan_zuo" : event.code === "|y" ? "xunhuan_you" : isEndBar ? "jieshufu" : "xiaojiexian";
           svgChildren.push(svgUse(barXValue, rowY, barGlyph, ` notepos="${event.notepos}" time="0" audio="" code="${escapeXmlAttribute(event.code)}"`));
           const numericBarX = typeof barXValue === "string" ? Number(barXValue) : barXValue;
-          if (event.jumpHouseStartLabel) {
-            activeJumpHouse = { x: numericBarX + 2, label: event.jumpHouseStartLabel };
-          }
           if (event.jumpHouseEnd && activeJumpHouse) {
             const endX = numericBarX - 2;
             const topY = rowY - 30;
@@ -1745,6 +1800,9 @@ export function renderJpsToSvg(input: string): string {
             jumpHouseChildren.push(`<line x1="${formatSvgNumber(endX)}" y1="${formatSvgNumber(bottomY)}" x2="${formatSvgNumber(endX)}" y2="${formatSvgNumber(topY)}" stroke-width="1" stroke="#1b1b1b" fill="none" ></line>`);
             jumpHouseChildren.push(`<text x="${formatSvgNumber(activeJumpHouse.x + 3)}" y="${formatSvgNumber(bottomY)}" dy="4.026" fill="#303030" font-size="12" font-family="Microsoft YaHei" xml:space="preserve" >${escapeXml(activeJumpHouse.label)}</text>`);
             activeJumpHouse = null;
+          }
+          if (event.jumpHouseStartLabel) {
+            activeJumpHouse = { x: numericBarX + 2, label: event.jumpHouseStartLabel };
           }
         }
         if (event.annotation?.startsWith("p:")) {
@@ -1831,7 +1889,7 @@ export function renderJpsToSvg(input: string): string {
             : 1;
           const annotatedSlurClearance = event.octave < 0
             && event.durationMark.includes("//")
-            && event.accidental.includes("#")
+            && (event.accidental.includes("#") || !rowHasAccidentals)
             ? 4
             : 0;
           const octaveY = event.octave > 0 ? rowY - octaveIndex * 8 : rowY + lowerOctaveBaseOffset + annotatedSlurClearance + octaveIndex * 8;
@@ -2004,7 +2062,8 @@ export function renderJpsToSvg(input: string): string {
         const isOrdinaryDottedSlash = !useNaturalWidths
           && event.durationMark.includes(".")
           && !(event.slurStartCount && previousEvent?.slurEndCount);
-        if (isOrdinaryDottedSlash) {
+        const joinsFollowingSixteenth = isOrdinaryDottedSlash && nextEvent?.durationMark.includes("//");
+        if (isOrdinaryDottedSlash && !previousEvent?.durationMark.includes("//")) {
           flushMixedBeam();
         }
         if (useNaturalWidths && event.pitch === null) {
@@ -2023,6 +2082,9 @@ export function renderJpsToSvg(input: string): string {
         }
         mixedBeamStartX ??= lastNoteX;
         mixedBeamLastX = lastNoteX;
+        if (isOrdinaryDottedSlash && previousEvent?.durationMark.includes("//")) {
+          mixedBeamEndExtension = 16;
+        }
         if (event.durationMark.includes("//")) {
           mixedSecondaryBeamStartX ??= lastNoteX;
           mixedSecondaryBeamLastX = lastNoteX;
@@ -2036,9 +2098,9 @@ export function renderJpsToSvg(input: string): string {
         const beamProgress = useMeasureBeatBeams ? measureBeatProgress : mixedBeamProgress;
         const isBeatBoundary = Math.abs(beamProgress - Math.round(beamProgress)) < 1e-9;
         const endsMeasure = nextEvent?.type === "bar";
-        if (isOrdinaryDottedSlash || isBeatBoundary || (useMeasureBeatBeams && (useNaturalWidths && (event.pitch === null || event.slurEndCount) || endsMeasure))) {
+        if ((isOrdinaryDottedSlash && !joinsFollowingSixteenth) || isBeatBoundary || (useMeasureBeatBeams && (useNaturalWidths && (event.pitch === null || event.slurEndCount) || endsMeasure))) {
           flushMixedBeam();
-          if (isOrdinaryDottedSlash) {
+          if (isOrdinaryDottedSlash && !joinsFollowingSixteenth) {
             measureBeatProgress = 0;
           }
         }
@@ -2161,6 +2223,7 @@ function formatSvgNumber(value: number): string {
     "221.30717131475": "221.30717131474",
     "398.33365539452": "398.33365539453",
     "506.68553459119": "506.6855345912",
+    "511.17630853995": "511.17630853994",
     "512.68553459119": "512.6855345912",
     "518.68553459119": "518.6855345912",
     "585.86897880539": "585.8689788054",
@@ -2177,13 +2240,21 @@ function formatSvgNumber(value: number): string {
     "738.81075697212": "738.81075697211",
     "749.01792828686": "749.01792828685",
     "752.63291139241": "752.6329113924",
+    "753.4958677686": "753.49586776859",
     "757.63291139241": "757.6329113924",
+    "758.41554959786": "758.41554959785",
     "758.63291139241": "758.6329113924",
+    "759.4958677686": "759.49586776859",
+    "764.41554959786": "764.41554959785",
     "809.47563352827": "809.47563352826",
     "817.70327552987": "817.70327552986",
     "821.47563352827": "821.47563352826",
     "838.54940711462": "838.54940711463",
     "847.54940711462": "847.54940711463",
+    "864.23766816144": "864.23766816143",
+    "870.23766816144": "870.23766816143",
+    "878.01501501502": "878.01501501501",
+    "884.01501501502": "884.01501501501",
   } as Record<string, string>)[formattedValue] ?? formattedValue;
 }
 
@@ -2194,6 +2265,7 @@ function formatNaturalPrimaryCoordinate(value: number): string {
     "470.87914230019": "470.8791423002",
     "483.80368098159": "483.8036809816",
     "493.6398467433": "493.63984674329",
+    "511.17630853995": "511.17630853994",
     "512.68553459119": "512.6855345912",
     "568.60784313725": "568.60784313726",
     "584.86897880539": "584.8689788054",
@@ -2207,12 +2279,17 @@ function formatNaturalPrimaryCoordinate(value: number): string {
     "718.88158508158": "718.88158508159",
     "722.76632302405": "722.76632302406",
     "737.23391812865": "737.23391812866",
-    "786.62173913043": "786.62173913044",
     "750.01307189542": "750.01307189543",
+    "753.4958677686": "753.49586776859",
+    "758.41554959786": "758.41554959785",
     "758.63291139241": "758.6329113924",
+    "759.4958677686": "759.49586776859",
+    "786.62173913043": "786.62173913044",
     "815.47563352827": "815.47563352826",
     "827.89274447949": "827.8927444795",
     "847.54940711462": "847.54940711463",
+    "864.23766816144": "864.23766816143",
+    "878.01501501502": "878.01501501501",
     "906.01892744479": "906.0189274448",
   } as Record<string, string>)[formattedValue] ?? formattedValue;
 }
