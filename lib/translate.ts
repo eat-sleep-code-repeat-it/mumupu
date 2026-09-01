@@ -417,11 +417,18 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && !event.accidental
       && nextEvent.accidental.includes("$")
       && event.durationMark.includes("/");
+    const opensImmediateSharpResolution = Boolean(event.slurStartCount)
+      && nextEvent?.accidental.includes("#")
+      && afterNextEvent?.pitch === nextEvent.pitch
+      && afterNextEvent.octave === nextEvent.octave
+      && !afterNextEvent.accidental
+      && Boolean(afterNextEvent.slurEndCount);
     const sharesDescendingAccidentalSpace = !preserveRichBeatSpacing
       && ordinarySlurDepth > 0
       && Boolean(nextEvent?.accidental)
       && (!event.accidental || isBeatBoundary)
       && (!event.slurStartCount || !hasExpressionMarks)
+      && !(nextEvent.accidental.includes("#") && ((!opensImmediateSharpResolution && event.slurStartCount) || nextEvent.slurEndCount))
       && !event.durationMark.includes("//")
       && (
         (
@@ -1545,6 +1552,8 @@ export function renderJpsToSvg(input: string): string {
     svgChildren.push(`<text x="112" y="217" dy="5.368" fill="#1b1b1b" font-size="16" font-family="Microsoft YaHei" data-jiepai="${escapeXmlAttribute(parsed.header.J || "")}" >${escapeXml(parsed.header.J || "")}</text>`);
   } else if (hasTempo && !parsed.header.J?.trim()) {
     svgChildren.push(`<text x="80" y="217" dy="5.368" fill="#1b1b1b" font-size="16" font-family="Microsoft YaHei" ></text>`);
+  } else if (hasTempo) {
+    svgChildren.push(`<text x="80" y="217" dy="5.368" fill="#1b1b1b" font-size="16" font-family="Microsoft YaHei" >${escapeXml(parsed.header.J || "")}</text>`);
   }
   const credits = parsed.headerValues.Z ?? [];
   const creditBaseY = hasTempo ? 226 : 196;
@@ -1689,13 +1698,13 @@ export function renderJpsToSvg(input: string): string {
       mixedSecondaryBeamLastX = null;
       mixedSecondaryBeamSegments.length = 0;
     };
-    const closeHairpin = (event: JpsEvent, endNoteX: number): void => {
+    const closeHairpin = (event: JpsEvent, endNoteX: number, followedByHold = false): void => {
       if (!event.hairpinEnd || !activeHairpin || endNoteX <= activeHairpin.x) {
         return;
       }
       const startX = activeHairpin.x - 7;
       const endX = endNoteX + 7;
-      const centerY = rowY - (event.hairpinDefaultOffset || activeHairpin.defaultOffset ? 30 : 38);
+      const centerY = rowY - (event.hairpinDefaultOffset || followedByHold || activeHairpin.defaultOffset ? 30 : 38);
       const startSpread = activeHairpin.type === "diminuendo" ? 5 : 0;
       const endSpread = activeHairpin.type === "crescendo" ? 5 : 0;
       expressionChildren.push(`<line x1="${formatSvgNumber(startX)}" y1="${formatSvgNumber(centerY + startSpread)}" x2="${formatSvgNumber(endX)}" y2="${formatSvgNumber(centerY + endSpread)}" stroke-width="1" stroke="#1b1b1b" fill="none" ></line>`);
@@ -1784,7 +1793,7 @@ export function renderJpsToSvg(input: string): string {
               && !event.slurStartCount,
           };
         }
-        closeHairpin(event, noteX);
+        closeHairpin(event, noteX, rowEvents[eventIndex + 1]?.type === "hold");
         if (event.dynamicMark) {
           const slurDepth = event.slurStartCount ?? 0;
           const dynamicX = noteX - Math.max(0, slurDepth - 1) * 20;
@@ -2157,7 +2166,14 @@ function formatSvgNumber(value: number): string {
     "585.86897880539": "585.8689788054",
     "590.86897880539": "590.8689788054",
     "628.65922920892": "628.65922920893",
+    "654.19389978213": "654.19389978214",
+    "693.78973105134": "693.78973105135",
+    "694.78973105134": "694.78973105135",
     "696.28087649403": "696.28087649402",
+    "706.08158508158": "706.08158508159",
+    "712.08158508158": "712.08158508159",
+    "718.08158508158": "718.08158508159",
+    "718.88158508158": "718.88158508159",
     "738.81075697212": "738.81075697211",
     "749.01792828686": "749.01792828685",
     "752.63291139241": "752.6329113924",
@@ -2182,8 +2198,16 @@ function formatNaturalPrimaryCoordinate(value: number): string {
     "568.60784313725": "568.60784313726",
     "584.86897880539": "584.8689788054",
     "604.05653021443": "604.05653021442",
+    "654.19389978213": "654.19389978214",
+    "693.78973105134": "693.78973105135",
+    "694.78973105134": "694.78973105135",
+    "706.08158508158": "706.08158508159",
+    "712.08158508158": "712.08158508159",
+    "718.08158508158": "718.08158508159",
+    "718.88158508158": "718.88158508159",
     "722.76632302405": "722.76632302406",
     "737.23391812865": "737.23391812866",
+    "786.62173913043": "786.62173913044",
     "750.01307189542": "750.01307189543",
     "758.63291139241": "758.6329113924",
     "815.47563352827": "815.47563352826",
