@@ -25,7 +25,7 @@ Date: 2026-08-31
 
 ## Verification
 
-- `047-keketuodemuyangren.jps` is byte-exact against its 123531-byte cached oracle.
+- `047-keketuodemuyangren.jps` is byte-exact against its 123515-byte cached oracle.
 - Both G String alternative-key fixtures, Memory Cats, and Londonderry remain byte-exact.
 - `pnpm run verify:translate` reports 4 exact focused fixtures.
 - `pnpm run verify:songs` reports 12 exact, 26 mismatched, and 0 missing caches.
