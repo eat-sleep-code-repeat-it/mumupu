@@ -17,6 +17,10 @@ const EXTRA_GLYPH_DEFS: Record<string, string> = {
     '<g id="xunhuan_zuo" transform="translate(-50,-50)"><rect fill="#ffffff" stroke-width="0" x="46.65" y="35.75" width="12.1" height="28.4"/><rect height="29" width="2.4" y="35.5" x="48.35" stroke-width="null" fill="#1b1b1b"/><rect height="29" width="1" y="35.5" x="52.3" stroke-width="null" fill="#1b1b1b"/><circle r="1.53489" cy="44.675" cx="56.775" fill="#1b1b1b"/><circle r="1.53489" cy="55.325" cx="56.825" fill="#1b1b1b"/></g>',
   xunhuan_you:
     '<g id="xunhuan_you" transform="translate(-50,-50)"><rect height="28.4" width="12.1" y="35.75" x="39.95" stroke-width="0" fill="#ffffff"/><rect height="29" width="1" y="35.5" x="45.65" fill="#1b1b1b"/><rect height="29" width="2.4" y="35.5" x="48.35" fill="#1b1b1b"/><circle r="1.53489" cy="44.15" cx="41.75" fill="#1b1b1b"/><circle r="1.53489" cy="54.8" cx="41.8" fill="#1b1b1b"/></g>',
+  kuohu_zuo:
+    '<g id="kuohu_zuo" transform="translate(-50,-50)"><path fill="#1b1b1b" d="m36.1523,40.8691q-3.2273,3.6996 -3.2273,9.0718t3.2273,9.19l1.6727,0q-3.247,-3.9751 -3.247,-9.1703t3.2273,-9.0915l-1.653,0l0,0z"/></g>',
+  kuohu_you:
+    '<g id="kuohu_you" transform="translate(-50,-50)"><path fill="#1b1b1b" d="m64.02271,40.8691q3.2273,3.6996 3.2273,9.0718t-3.2273,9.19l-1.67271,0q3.247,-3.9751 3.247,-9.1703t-3.2273,-9.0915l1.65301,0l0,0z"/></g>',
   lianyinxian_zuo:
     '<g id="lianyinxian_zuo" transform="translate(-50,-50)"><path stroke="#1b1b1b" d="m50.75,50.75c0,0 -8.39389,0.56947 -12.21896,8.88383" stroke-linecap="round" stroke-linejoin="null" stroke-width="1.2" fill="none"/></g>',
   lianyinxian_you:
@@ -71,6 +75,7 @@ export interface JpsEvent {
   hairpinEnd?: boolean;
   hairpinDefaultOffset?: boolean;
   dynamicMark?: string;
+  accompanimentBracket?: "left" | "right";
   jumpHouseStartLabel?: string;
   jumpHouseEnd?: boolean;
 }
@@ -207,6 +212,9 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
   const repeatedSamePitchDottedPairCount = events.filter((event, eventIndex) => event.durationMark.includes(".")
     && events[eventIndex + 1]?.pitch === event.pitch
     && events[eventIndex + 1]?.durationMark.includes("//")).length;
+  const accompanimentStartIndex = events.findIndex((event) => event.accompanimentBracket === "left");
+  const accompanimentEndIndex = events.findIndex((event) => event.accompanimentBracket === "right");
+  const hasAccompanimentBracket = accompanimentStartIndex >= 0 || accompanimentEndIndex >= 0;
   const lowDottedMixedMeasureIndexes = new Set(events
     .filter((event, eventIndex) => event.type === "note"
       && event.octave < 0
@@ -262,7 +270,10 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
         }
         return 1.8;
       }
-      return 2.8 + (event.annotation?.startsWith("p:") ? 2 : 0) + (hasLeadingAccidental(nextEvent) ? 0.4 : 0);
+      return 2.8
+        + (nextEvent?.accompanimentBracket === "left" ? 1 : 0)
+        + (event.annotation?.startsWith("p:") ? 2 : 0)
+        + (hasLeadingAccidental(nextEvent) ? 0.4 : 0);
     }
 
     if (event.type === "dynamic") {
@@ -277,6 +288,9 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     ordinarySlurDepth += event.slurStartCount ?? 0;
     rowLocalSlurDepth += event.slurStartCount ?? 0;
     let width = 1 + event.time * 2;
+    if (event.accompanimentBracket) {
+      width += 1;
+    }
     if (!preserveRichBeatSpacing && event.durationMark.includes("//")) {
       width += 0.5;
     }
@@ -409,6 +423,21 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
         && event.durationMark.includes("/")
         && !hasCrescendo
       )
+    ) {
+      width += 0.4;
+    }
+    if (
+      hasAccompanimentBracket
+      && isBeatBoundary
+      && event.pitch === "5"
+      && event.durationMark === "/"
+      && previousEvent?.pitch === "4"
+      && previousEvent.accidental.includes("#")
+      && previousEvent.durationMark === "/"
+      && nextEvent?.pitch === "6"
+      && !nextEvent.accidental
+      && afterNextEvent?.pitch === "4"
+      && afterNextEvent.accidental.includes("#")
     ) {
       width += 0.4;
     }
@@ -1411,7 +1440,11 @@ export function parseJpsEvents(input: string): JpsEvent[] {
     };
 
     for (let tokenIndex = 0; tokenIndex < line.tokens.length; tokenIndex += 1) {
-      const token = line.tokens[tokenIndex];
+      const rawToken = line.tokens[tokenIndex];
+      const accompanimentMarker = rawToken.match(/&(zkh|ykh)(?="|$)/)?.[1];
+      const accompanimentBracket = accompanimentMarker === "zkh" ? "left" : accompanimentMarker === "ykh" ? "right" : undefined;
+      const accompanimentCode = accompanimentMarker ? `+${accompanimentMarker}` : "";
+      const token = rawToken.replace(/&(zkh|ykh)(?="|$)/, "");
       if (token === ":" && line.tokens[tokenIndex + 1] === "|") {
         events.push({
           ...createJpsEvent("bar", ":|", melodyLineIndex, eventIndex, measureIndex, lineIndex),
@@ -1454,6 +1487,8 @@ export function parseJpsEvents(input: string): JpsEvent[] {
           previousBar.code = `${previousBar.code}['${label}'`;
           previousBar.jumpHouseStartLabel = label;
           tokenIndex += 1;
+        } else if (previousBar?.type === "bar" && previousBar.lineIndex === lineIndex) {
+          previousBar.code = `${previousBar.code}[`;
         }
         continue;
       }
@@ -1569,9 +1604,11 @@ export function parseJpsEvents(input: string): JpsEvent[] {
 
       if (/^-!?$/.test(token)) {
         events.push({
-          ...createJpsEvent("hold", token, melodyLineIndex, eventIndex, measureIndex, lineIndex),
+          ...createJpsEvent("hold", rawToken, melodyLineIndex, eventIndex, measureIndex, lineIndex),
+          code: `${token}${accompanimentCode}`,
           time: 1,
           hairpinEnd: token.includes("!") || undefined,
+          accompanimentBracket,
         });
         eventIndex += 1;
         continue;
@@ -1622,7 +1659,7 @@ export function parseJpsEvents(input: string): JpsEvent[] {
       const isDynamic = parsedToken.annotation?.startsWith("p:") ?? false;
       const activeTuplet = groupStack.findLast((group) => group.isTuplet);
       const decorationCode = `${parsedToken.dynamicMark ? `+${parsedToken.dynamicMark}` : ""}${parsedToken.hairpinEnd ? "!" : ""}`;
-      const normalizedCode = `${parsedToken.notationCode}${decorationCode}`;
+      const normalizedCode = `${parsedToken.notationCode}${decorationCode}${accompanimentCode}`;
       const isGroupedNote = !isDynamic && Boolean(activeTuplet);
       const isGroupStart = isGroupedNote && token.startsWith("y") && token.length > 1;
       const slurStartCount = isDynamic ? 0 : groupStack.filter((group) => !group.isTuplet && group.startsOnNextNote).length;
@@ -1639,7 +1676,7 @@ export function parseJpsEvents(input: string): JpsEvent[] {
         }
       });
       events.push({
-        ...createJpsEvent(isDynamic ? "dynamic" : "note", token, melodyLineIndex, eventIndex, measureIndex, lineIndex),
+        ...createJpsEvent(isDynamic ? "dynamic" : "note", rawToken, melodyLineIndex, eventIndex, measureIndex, lineIndex),
         code: isGroupStart
           ? groupedStartCode(parsedToken.rawValue, parsedToken.pitchSuffix, parsedToken.durationMark, decorationCode)
           : slurStartCount > 0
@@ -1663,6 +1700,7 @@ export function parseJpsEvents(input: string): JpsEvent[] {
         hairpinStart: parsedToken.hairpinStart,
         hairpinEnd: parsedToken.hairpinEnd,
         dynamicMark: parsedToken.dynamicMark,
+        accompanimentBracket,
       });
       eventIndex += 1;
     }
@@ -2011,7 +2049,8 @@ export function renderJpsToSvg(input: string): string {
   scoreLines.forEach((line, rowIndex) => {
     const sourceLineIndex = parsed.lines.indexOf(line);
     const rowEvents = events.filter((event) => event.lineIndex === sourceLineIndex);
-    const rowHasJumpHouse = rowEvents.some((event) => event.jumpHouseStartLabel);
+    const rowHasJumpHouse = rowEvents.some((event) => event.jumpHouseStartLabel)
+      || line.tokens.at(-1) === "[";
     if (rowHasJumpHouse) {
       rowY += 12;
     }
@@ -2260,6 +2299,11 @@ export function renderJpsToSvg(input: string): string {
           slur.hasHold = true;
         });
         svgChildren.push(svgUse(naturalAdvances ? naturalXText : x, rowY, "yanyinfu", ` time="${formatTimeValue(event.time)}" audio="" notepos="${event.notepos}" code="${escapeXmlAttribute(event.code)}"`));
+        if (event.accompanimentBracket) {
+          const bracketChild = svgUse(naturalAdvances ? naturalXText : x, rowY, event.accompanimentBracket === "left" ? "kuohu_zuo" : "kuohu_you", "");
+          naturalPitchDecorationChildren.push(bracketChild);
+          orderedPitchDecorationChildren.push(bracketChild);
+        }
         closeHairpin(event, x);
       } else if (event.type === "dynamic") {
         pushTemporaryMeter(svgChildren, x + 11, rowY, event.annotation ?? event.code);
@@ -2276,6 +2320,11 @@ export function renderJpsToSvg(input: string): string {
         const glyph = event.pitch === null ? (event.raw.startsWith("8") ? "shuzi_b_8" : "shuzi_b_0") : `shuzi_b_${event.pitch}`;
         if (!event.isHiddenRest) {
           svgChildren.push(svgUse(noteXText, rowY, glyph, ` time="${formatTimeValue(event.time)}" audio="${escapeXmlAttribute(event.audio ?? "")}" notepos="${event.notepos}" code="${escapeXmlAttribute(event.code)}"`));
+        }
+        if (event.accompanimentBracket) {
+          const bracketChild = svgUse(noteXText, rowY, event.accompanimentBracket === "left" ? "kuohu_zuo" : "kuohu_you", "");
+          naturalPitchDecorationChildren.push(bracketChild);
+          orderedPitchDecorationChildren.push(bracketChild);
         }
         lastNoteX = noteX;
         noteXs.push(noteX);
@@ -2731,6 +2780,8 @@ function formatSvgNumber(value: number): string {
     "193.13184584178": "193.13184584179",
     "208.37808764941": "208.3780876494",
     "221.30717131475": "221.30717131474",
+    "307.40138408305": "307.40138408304",
+    "308.40138408305": "308.40138408304",
     "401.69061876247": "401.69061876248",
     "402.69061876247": "402.69061876248",
     "413.69061876247": "413.69061876248",
@@ -2747,12 +2798,15 @@ function formatSvgNumber(value: number): string {
     "628.65922920892": "628.65922920893",
     "654.19389978213": "654.19389978214",
     "693.78973105134": "693.78973105135",
+    "691.59861591696": "691.59861591695",
     "694.78973105134": "694.78973105135",
     "696.28087649403": "696.28087649402",
     "706.08158508158": "706.08158508159",
     "711.70563674321": "711.70563674322",
     "712.08158508158": "712.08158508159",
     "717.70563674321": "717.70563674322",
+    "716.70103092784": "716.70103092783",
+    "719.70103092784": "719.70103092783",
     "718.08158508158": "718.08158508159",
     "718.88158508158": "718.88158508159",
     "728.27710843373": "728.27710843374",
@@ -2771,11 +2825,15 @@ function formatSvgNumber(value: number): string {
     "817.70327552987": "817.70327552986",
     "821.47563352827": "821.47563352826",
     "838.54940711462": "838.54940711463",
+    "829.00692041523": "829.00692041522",
+    "844.00692041523": "844.00692041522",
     "847.54940711462": "847.54940711463",
     "848.1052631579": "848.10526315789",
     "853.1052631579": "853.10526315789",
     "860.48008849558": "860.48008849557",
     "870.24796747967": "870.24796747968",
+    "869.89278350516": "869.89278350515",
+    "872.89278350516": "872.89278350515",
     "876.04437869823": "876.04437869822",
     "877.24796747967": "877.24796747968",
     "864.23766816144": "864.23766816143",
@@ -2784,6 +2842,8 @@ function formatSvgNumber(value: number): string {
     "880.00437636762": "880.00437636761",
     "880.53719008264": "880.53719008265",
     "884.01501501502": "884.01501501501",
+    "887.50103092784": "887.50103092783",
+    "902.50103092784": "902.50103092783",
   } as Record<string, string>)[formattedValue] ?? formattedValue;
 }
 
@@ -2797,6 +2857,7 @@ function formatNaturalPrimaryCoordinate(value: number, usesFixedDoRounding = fal
     "568.63106796117": "568.63106796116",
     "870.04437869823": "870.04437869822",
     "192.13184584178": "192.13184584179",
+    "319.40138408305": "319.40138408304",
     "413.69061876247": "413.69061876248",
     "415.94346978557": "415.94346978558",
     "448.00204498977": "448.00204498978",
@@ -2810,9 +2871,11 @@ function formatNaturalPrimaryCoordinate(value: number, usesFixedDoRounding = fal
     "584.86897880539": "584.8689788054",
     "604.05653021443": "604.05653021442",
     "654.19389978213": "654.19389978214",
+    "682.64981949459": "682.64981949458",
     "686.17482517482": "686.17482517483",
     "693.78973105134": "693.78973105135",
     "694.78973105134": "694.78973105135",
+    "700.59861591696": "700.59861591695",
     "706.08158508158": "706.08158508159",
     "712.08158508158": "712.08158508159",
     "716.03496503496": "716.03496503497",
@@ -2820,6 +2883,7 @@ function formatNaturalPrimaryCoordinate(value: number, usesFixedDoRounding = fal
     "718.08158508158": "718.08158508159",
     "718.88158508158": "718.88158508159",
     "722.76632302405": "722.76632302406",
+    "725.70103092784": "725.70103092783",
     "737.23391812865": "737.23391812866",
     "739.19852941177": "739.19852941176",
     "765.27173913044": "765.27173913043",
@@ -2831,11 +2895,14 @@ function formatNaturalPrimaryCoordinate(value: number, usesFixedDoRounding = fal
     "786.62173913043": "786.62173913044",
     "815.47563352827": "815.47563352826",
     "827.89274447949": "827.8927444795",
+    "838.00692041523": "838.00692041522",
     "847.1052631579": "847.10526315789",
     "847.54940711462": "847.54940711463",
     "864.23766816144": "864.23766816143",
     "876.24796747967": "876.24796747968",
+    "878.89278350516": "878.89278350515",
     "878.01501501502": "878.01501501501",
+    "896.50103092784": "896.50103092783",
     "906.01892744479": "906.0189274448",
   } as Record<string, string>)[formattedValue] ?? formattedValue;
 }
