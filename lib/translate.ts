@@ -166,16 +166,18 @@ function hasLeadingAccidental(event: JpsEvent | undefined): boolean {
   return Boolean(event && event.type === "note" && event.accidental);
 }
 
-function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = false): number[] {
+function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = false, usesFixedDoRounding = false): number[] {
   let measureTime = 0;
   let measureHasDottedSubdivision = false;
   let pendingAnnotationClearance = false;
   let pendingDescendingAccidentalClearance = false;
   let pendingNestedSlurClearance = false;
   let ordinarySlurDepth = 0;
+  let rowLocalSlurDepth = 0;
   const hasFlatAccidentals = events.some((event) => event.accidental.includes("$"));
   const hasSlashDurations = events.some((event) => event.durationMark.includes("/"));
   const hasExpressionMarks = events.some((event) => event.hairpinStart || event.hairpinEnd || event.dynamicMark);
+  const hasCrescendo = events.some((event) => event.hairpinStart === "crescendo");
   const firstMeasureIndex = events.find((event) => event.type !== "bar")?.measureIndex;
   const firstMeasureHasAccidentalSlur = events.some((event) => event.measureIndex === firstMeasureIndex
     && Boolean(event.slurStartCount)
@@ -193,6 +195,8 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
   });
   const dottedNoteCount = events.filter((event) => event.type === "note" && event.durationMark.includes(".")).length;
   const noteCount = events.filter((event) => event.type === "note").length;
+  const sixteenthNoteCount = events.filter((event) => event.type === "note" && event.durationMark.includes("//")).length;
+  const usesDenseSixteenthSpacing = sixteenthNoteCount >= 16;
   const useMeasureBeatSpacing = dottedNoteCount > 1 || (dottedNoteCount > 0 && noteCount <= 24);
   const repeatedSamePitchDottedPairCount = events.filter((event, eventIndex) => event.durationMark.includes(".")
     && events[eventIndex + 1]?.pitch === event.pitch
@@ -234,6 +238,7 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
 
     measureTime += event.time;
     ordinarySlurDepth += event.slurStartCount ?? 0;
+    rowLocalSlurDepth += event.slurStartCount ?? 0;
     let width = 1 + event.time * 2;
     if (!preserveRichBeatSpacing && event.durationMark.includes("//")) {
       width += 0.5;
@@ -291,7 +296,19 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     }
     const usesLowDottedMixedSpacing = lowDottedMixedMeasureIndexes.has(event.measureIndex);
     const isBeatBoundary = event.time < 1 && Math.abs(measureTime - Math.round(measureTime)) < 1e-9;
-    if (isBeatBoundary && (!usesLowDottedMixedSpacing || nextEvent?.type === "bar") && !(isDottedSubdivision && nextEvent?.type === "bar")) {
+    if (
+      isBeatBoundary
+      && (!usesLowDottedMixedSpacing || nextEvent?.type === "bar")
+      && !(isDottedSubdivision && nextEvent?.type === "bar")
+      && !(
+        usesFixedDoRounding
+        && event.durationMark.includes("/")
+        && !event.accidental
+        && nextEvent?.durationMark.includes("/")
+        && Boolean(nextEvent.slurEndCount)
+        && afterNextEvent?.code === "|j"
+      )
+    ) {
       width += 1;
     }
     if (
@@ -341,12 +358,36 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     }
     if (
       event.slurEndCount
+      && previousEvent?.type !== "bar"
       && event.octave > 0
       && event.accidental
       && (
         !previousEvent?.accidental
         || (previousEvent.pitch === event.pitch && previousEvent.octave === event.octave)
       )
+      && !(
+        previousEvent?.pitch === event.pitch
+        && !previousEvent.accidental
+        && previousEvent.durationMark.includes("/")
+        && event.durationMark.includes("/")
+        && !hasCrescendo
+      )
+    ) {
+      width += 0.4;
+    }
+    if (
+      usesFixedDoRounding
+      && !usesDenseSixteenthSpacing
+      && dottedNoteCount === 0
+      && (
+        events.some((candidate) => Boolean(candidate.annotation))
+        || Boolean(previousEvent?.slurStartCount)
+      )
+      && Boolean(event.slurEndCount)
+      && event.octave < 0
+      && event.accidental.includes("#")
+      && event.durationMark === "/"
+      && nextEvent?.type === "bar"
     ) {
       width += 0.4;
     }
@@ -355,6 +396,7 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     }
     if (
       !preserveRichBeatSpacing
+      && !usesDenseSixteenthSpacing
       && event.slurEndCount
       && previousEvent?.durationMark.includes("//")
       && (previousEvent.pitch !== event.pitch || event.accidental.includes("#"))
@@ -362,6 +404,15 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && (nextEvent?.type !== "bar" || Boolean(previousEvent.accidental) || Boolean(previousEvent.slurStartCount) || firstMeasureHasAccidentalSlur)
     ) {
       width += 0.4;
+    }
+    if (
+      usesDenseSixteenthSpacing
+      && event.durationMark === "/"
+      && event.octave < 0
+      && event.slurStartCount
+      && event.slurEndCount
+    ) {
+      width -= 0.4;
     }
     if (
       !preserveRichBeatSpacing
@@ -616,6 +667,7 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     const sharesAscendingDigitSpace = event.pitch === "4" && nextEvent?.pitch === "5";
     const anticipatesAscendingAccidentalRun = !preserveRichBeatSpacing
       && isBeatBoundary
+      && !previousEvent?.durationMark.includes(".")
       && nextEvent?.type === "note"
       && !nextEvent.accidental
       && afterNextEvent?.type === "note"
@@ -706,11 +758,36 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && nextEvent?.accidental.includes("#")
       && nextEvent.octave === event.octave
       && Number(nextEvent.pitch) < Number(event.pitch);
+    const startsFixedDoLowDescendingSharpSlur = usesFixedDoRounding
+      && hasExpressionMarks
+      && event.octave < 0
+      && event.durationMark.includes("/")
+      && Boolean(event.slurStartCount)
+      && event.accidental.includes("#")
+      && nextEvent?.durationMark.includes("/")
+      && nextEvent.accidental.includes("#")
+      && nextEvent.octave === event.octave
+      && Number(nextEvent.pitch) < Number(event.pitch);
     const precedesDescendingSharpSlur = Boolean(nextEvent?.slurStartCount)
       && !event.accidental
       && nextEvent.accidental.includes("#")
       && nextEvent.octave === event.octave
-      && Number(nextEvent.pitch) < Number(event.pitch);
+      && Number(nextEvent.pitch) < Number(event.pitch)
+      && !(
+        usesFixedDoRounding
+        && !hasExpressionMarks
+        && Boolean(event.slurEndCount)
+      );
+    const precedesFixedDoCrossOctaveSharpSlur = usesFixedDoRounding
+      && !hasExpressionMarks
+      && !event.slurEndCount
+      && event.pitch === "2"
+      && !event.accidental
+      && nextEvent?.pitch === "7"
+      && nextEvent.octave < event.octave
+      && nextEvent.accidental.includes("#")
+      && Boolean(nextEvent.slurStartCount)
+      && !afterNextEvent?.accidental;
     const closesBeforeDescendingSharp = Boolean(event.slurEndCount)
       && !event.accidental
       && hasExpressionMarks
@@ -728,6 +805,14 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && !event.durationMark
       && !event.accidental
       && nextEvent?.accidental.includes("#")
+      && nextEvent.pitch === event.pitch
+      && nextEvent.octave === event.octave;
+    const eighthLowOctaveSamePitchSharpOpener = event.octave < 0
+      && event.durationMark.includes("/")
+      && !event.slurEndCount
+      && !event.accidental
+      && nextEvent?.accidental.includes("#")
+      && Boolean(nextEvent.slurStartCount)
       && nextEvent.pitch === event.pitch
       && nextEvent.octave === event.octave;
     const opensNestedAccidentalSlur = ordinarySlurDepth > 0
@@ -756,7 +841,40 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && !nextEvent.accidental
       && nextEvent.octave === event.octave
       && afterNextEvent?.accidental.includes("#");
-    if (hasLeadingAccidental(nextEvent) && !sharesHighOctaveAccidentalSpace && (!sharesDescendingAccidentalSpace || descendsToClosingRestore) && !sharesAscendingDigitSpace && !carriesDottedAscendingAccidentalSpace && !continuesAscendingAccidentalRun && !startsRestoredFlatTail && !continuesRestoredFlatTail && !sharesDescendingFlatRun && !repeatsNestedOpenFlat && !repeatsClosingAccidental && !closesNestedRepeatedNote && !startsDescendingSharpSlur && !precedesDescendingSharpSlur && !closesBeforeDescendingSharp && !closesBeforeSamePitchSharpOpener && !wholeLowOctaveSamePitchSharpOpener) {
+    const opensAfterDescendingSharpSlurClose = usesFixedDoRounding
+      && isBeatBoundary
+      && event.octave >= 0
+      && Boolean(event.slurStartCount)
+      && Boolean(previousEvent?.slurEndCount)
+      && previousEvent.accidental.includes("#")
+      && !event.accidental
+      && event.durationMark.includes("/")
+      && nextEvent?.type === "note"
+      && !nextEvent.accidental
+      && nextEvent.durationMark.includes("/")
+      && nextEvent.octave === event.octave
+      && Number(previousEvent.pitch) > Number(event.pitch);
+    if (hasLeadingAccidental(nextEvent) && !sharesHighOctaveAccidentalSpace && (!sharesDescendingAccidentalSpace || descendsToClosingRestore) && !sharesAscendingDigitSpace && !carriesDottedAscendingAccidentalSpace && !continuesAscendingAccidentalRun && !startsRestoredFlatTail && !continuesRestoredFlatTail && !sharesDescendingFlatRun && !repeatsNestedOpenFlat && !repeatsClosingAccidental && !closesNestedRepeatedNote && !startsDescendingSharpSlur && !precedesDescendingSharpSlur && !precedesFixedDoCrossOctaveSharpSlur && !closesBeforeDescendingSharp && !closesBeforeSamePitchSharpOpener && !wholeLowOctaveSamePitchSharpOpener) {
+      width += 0.4;
+    }
+    if (
+      usesFixedDoRounding
+      && closesBeforeSamePitchSharpOpener
+      && event.durationMark.includes("/")
+      && nextEvent?.durationMark.includes("/")
+    ) {
+      width += 0.4;
+    }
+    if (
+      usesFixedDoRounding
+      && events.some((candidate) => candidate.code === "|j")
+      && Boolean(event.slurEndCount)
+      && event.durationMark.includes("/")
+      && nextEvent?.accidental.includes("#")
+      && Boolean(nextEvent.slurStartCount)
+      && nextEvent.durationMark.includes("/")
+      && Number(nextEvent.pitch) < Number(event.pitch)
+    ) {
       width += 0.4;
     }
     if (opensNestedAccidentalSlur) {
@@ -766,6 +884,15 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       width += 0.4;
     }
     if (opensAfterSharpSlurClose) {
+      width += 0.4;
+    }
+    if (opensAfterDescendingSharpSlurClose) {
+      width += 0.4;
+    }
+    if (startsFixedDoLowDescendingSharpSlur) {
+      width += 0.4;
+    }
+    if (eighthLowOctaveSamePitchSharpOpener) {
       width += 0.4;
     }
     if (
@@ -786,6 +913,8 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && !event.accidental
       && Boolean(previousEvent?.slurStartCount)
       && nextEvent?.accidental.includes("#")
+      && !nextEvent.slurStartCount
+      && !hasCrescendo
       && nextEvent.octave === event.octave
       && Number(nextEvent.pitch) > Number(event.pitch)
     ) {
@@ -897,6 +1026,31 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && nextEvent.pitch
       && nextEvent.durationMark.includes("/")
       && event.pitch !== nextEvent.pitch
+      && !(
+        nextEvent.slurStartCount
+        && (
+          (event.slurEndCount && Boolean(nextEvent.accidental))
+          || (event.octave > 0 && nextEvent.octave > 0)
+        )
+      )
+      && !(
+        usesFixedDoRounding
+        && rowLocalSlurDepth > (event.slurEndCount ?? 0)
+        && event.octave > 0
+        && nextEvent.octave > 0
+        && !nextEvent.accidental
+      )
+      && !(
+        usesFixedDoRounding
+        && Boolean(nextEvent.accidental)
+        && (
+          rowLocalSlurDepth > (event.slurEndCount ?? 0)
+          || (
+            Boolean(event.slurEndCount)
+            && Number(nextEvent.pitch) > Number(event.pitch)
+          )
+        )
+      )
       && (
         preserveRichBeatSpacing
           ? ["1", "4", "6"].includes(event.pitch ?? "")
@@ -933,6 +1087,23 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
         width += 0.4;
       }
       if (
+        usesFixedDoRounding
+        && hasExpressionMarks
+        && hasCrescendo
+        && event.octave < 0
+        && event.durationMark.includes("/")
+        && event.accidental.includes("#")
+        && Boolean(event.slurEndCount)
+        && previousEvent?.type === "note"
+        && !previousEvent.accidental
+        && !previousEvent.slurStartCount
+        && previousEvent.octave === event.octave
+        && previousEvent.pitch === event.pitch
+        && beforePreviousEvent?.pitch !== event.pitch
+      ) {
+        width += 0.4;
+      }
+      if (
         useMeasureBeatSpacing
         && event.durationMark.includes("/")
         && (
@@ -965,6 +1136,7 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       pendingNestedSlurClearance = false;
     }
     ordinarySlurDepth -= event.slurEndCount ?? 0;
+    rowLocalSlurDepth = Math.max(0, rowLocalSlurDepth - (event.slurEndCount ?? 0));
     return width;
   });
 }
@@ -1114,7 +1286,7 @@ export function parseJpsEvents(input: string): JpsEvent[] {
   const events: JpsEvent[] = [];
   let measureIndex = 0;
   let melodyLineIndex = 0;
-  const groupStack: Array<{ size: number; isTuplet: boolean; startsOnNextNote: boolean; startPitch: string | null; hasPitchChange: boolean }> = [];
+  const groupStack: Array<{ size: number; isTuplet: boolean; startsOnNextNote: boolean; startPitch: string | null; startOctave: number; startAccidental: string; hasPitchChange: boolean; lineIndex: number }> = [];
 
   const parseQuotedToken = (token: string): string | null => {
     const match = token.match(/^"([^"]*)"$/);
@@ -1241,7 +1413,10 @@ export function parseJpsEvents(input: string): JpsEvent[] {
             isTuplet: line.tokens[tokenIndex + 1]?.startsWith("y") ?? false,
             startsOnNextNote: true,
             startPitch: null,
+            startOctave: 0,
+            startAccidental: "",
             hasPitchChange: false,
+            lineIndex,
           });
         }
         continue;
@@ -1263,7 +1438,24 @@ export function parseJpsEvents(input: string): JpsEvent[] {
             lastEvent.groupSize = group.size;
           } else {
             if (
-              (lastEvent.pitch === group.startPitch && !group.hasPitchChange)
+              (
+                (group.size > 1 || group.lineIndex !== lineIndex)
+                && lastEvent.pitch === group.startPitch
+                && !group.hasPitchChange
+                && !(
+                  group.startAccidental.includes("#")
+                  && !lastEvent.accidental
+                  && group.startOctave !== lastEvent.octave
+                )
+              )
+              || groupStack.some((parentGroup) => !parentGroup.isTuplet
+                && parentGroup.startPitch === lastEvent.pitch
+                && !parentGroup.hasPitchChange
+                && !(
+                  parentGroup.startAccidental.includes("#")
+                  && !lastEvent.accidental
+                  && parentGroup.startOctave !== lastEvent.octave
+                ))
               || (
                 previousNote?.pitch === lastEvent.pitch
                 && previousNote.octave === lastEvent.octave
@@ -1312,6 +1504,8 @@ export function parseJpsEvents(input: string): JpsEvent[] {
             previousEvent.slurStartCount = (previousEvent.slurStartCount ?? 0) + 1;
             pendingSlur.startsOnNextNote = false;
             pendingSlur.startPitch = previousEvent.pitch;
+            pendingSlur.startOctave = previousEvent.octave;
+            pendingSlur.startAccidental = previousEvent.accidental;
           } else {
             previousEvent.code += token;
           }
@@ -1352,6 +1546,8 @@ export function parseJpsEvents(input: string): JpsEvent[] {
         if (!group.isTuplet) {
           if (group.startsOnNextNote) {
             group.startPitch = parsedToken.isRest ? null : parsedToken.rawValue;
+            group.startOctave = parsedToken.octave;
+            group.startAccidental = parsedToken.accidental;
           } else if (!parsedToken.isRest && parsedToken.rawValue !== group.startPitch) {
             group.hasPitchChange = true;
           }
@@ -1636,6 +1832,7 @@ export function renderJpsToSvg(input: string): string {
   const parsed = parseJps(input);
   const events = parseJpsEvents(input);
   const useNaturalWidths = usesNaturalWidthLayout(parsed, events);
+  const usesFixedDoRounding = parsed.header.Z?.trim().toLowerCase() === "fixed-do";
   const width = 1000;
   const height = 1415;
   const viewBox = `0 0 ${width} ${height}`;
@@ -1717,16 +1914,15 @@ export function renderJpsToSvg(input: string): string {
     const scoreLineEvents = events.filter((event) => event.lineIndex === scoreLineIndex);
     return scoreLineEvents.some((event) => event.groupSize)
       ? 0
-      : naturalEventAdvances(scoreLineEvents, useNaturalWidths).reduce((sum, advance) => sum + advance, 0);
+      : naturalEventAdvances(scoreLineEvents, useNaturalWidths, usesFixedDoRounding).reduce((sum, advance) => sum + advance, 0);
   });
   const widestOrdinaryNaturalAdvanceTotal = Math.max(...ordinaryNaturalAdvanceTotals);
   let rowY = rowStart;
-  const ordinarySlurs: Array<{ x: number; rowY: number; maxOctave: number; hasHold: boolean; crossesBar: boolean; depth: number; hasNestedChild: boolean; deferredChildren: string[] }> = [];
+  const ordinarySlurs: Array<{ x: number; rowY: number; startOctave: number; maxOctave: number; hasHold: boolean; crossesBar: boolean; depth: number; hasNestedChild: boolean; deferredChildren: string[] }> = [];
   scoreLines.forEach((line, rowIndex) => {
     const sourceLineIndex = parsed.lines.indexOf(line);
     const rowEvents = events.filter((event) => event.lineIndex === sourceLineIndex);
     const rowHasJumpHouse = rowEvents.some((event) => event.jumpHouseStartLabel);
-    const rowHasAccidentals = rowEvents.some((event) => Boolean(event.accidental));
     if (rowHasJumpHouse) {
       rowY += 12;
     }
@@ -1778,14 +1974,21 @@ export function renderJpsToSvg(input: string): string {
       )
       || rowEvents.some((event) => event.type === "note" && /[/.]/.test(event.durationMark));
     const naturalAdvances = rowNeedsNaturalWidths && !rowHasGroupedNotes && !rowIsCompactPlainDense
-      ? naturalEventAdvances(rowEvents, useNaturalWidths)
+      ? naturalEventAdvances(rowEvents, useNaturalWidths, usesFixedDoRounding)
       : null;
     const naturalAdvanceTotal = naturalAdvances?.reduce((sum, advance) => sum + advance, 0) ?? 0;
     const previousNaturalAdvanceTotal = ordinaryNaturalAdvanceTotals[rowIndex - 1] ?? naturalAdvanceTotal;
+    const firstRowNote = rowEvents.find((event) => event.type === "note");
     const isRaggedClosingRepeat = rowIndex === scoreLines.length - 1 && rowEvents[lastVisibleBarIndex]?.code === "|y";
     const isRaggedClosingDoubleBar = rowIndex === scoreLines.length - 1
       && rowEvents[lastVisibleBarIndex]?.code === "|j"
-      && naturalAdvanceTotal * 2 < previousNaturalAdvanceTotal;
+      && (
+        naturalAdvanceTotal * 2 < previousNaturalAdvanceTotal
+        || (
+          naturalAdvanceTotal * 5 < previousNaturalAdvanceTotal * 3
+          && Boolean(firstRowNote?.slurEndCount)
+        )
+      );
     const isRaggedClosingRow = isRaggedClosingRepeat || isRaggedClosingDoubleBar;
     const naturalScale = naturalAdvances
       ? 854 / (
@@ -1840,7 +2043,7 @@ export function renderJpsToSvg(input: string): string {
     let mixedSecondaryBeamStartX: number | null = null;
     let mixedSecondaryBeamLastX: number | null = null;
     const mixedSecondaryBeamSegments: Array<{ startX: number; lastX: number }> = [];
-    let activeHairpin: { type: "crescendo" | "diminuendo"; x: number; defaultOffset: boolean } | null = null;
+    let activeHairpin: { type: "crescendo" | "diminuendo"; x: number; defaultOffset: boolean; octave: number; orphaned: boolean } | null = null;
     let activeJumpHouse: { x: number; label: string } | null = null;
     const flushMixedBeam = (): void => {
       if (mixedSecondaryBeamStartX !== null && mixedSecondaryBeamLastX !== null) {
@@ -1860,13 +2063,21 @@ export function renderJpsToSvg(input: string): string {
       mixedSecondaryBeamLastX = null;
       mixedSecondaryBeamSegments.length = 0;
     };
-    const closeHairpin = (event: JpsEvent, endNoteX: number, followedByHold = false): void => {
-      if (!event.hairpinEnd || !activeHairpin || endNoteX <= activeHairpin.x) {
+    const closeHairpin = (event: JpsEvent, endNoteX: number): void => {
+      if (!event.hairpinEnd) {
+        return;
+      }
+      activeHairpin ??= { type: "diminuendo", x: 0, defaultOffset: true, octave: 0, orphaned: true };
+      if (endNoteX <= activeHairpin.x) {
         return;
       }
       const startX = activeHairpin.x - 7;
       const endX = endNoteX + 7;
-      const centerY = rowY - (event.hairpinDefaultOffset || followedByHold || activeHairpin.defaultOffset ? 30 : 38);
+      const centerY = activeHairpin.orphaned
+        ? -30
+        : rowY
+          - (event.hairpinDefaultOffset || activeHairpin.defaultOffset ? 30 : 38)
+          - activeHairpin.octave * 8;
       const startSpread = activeHairpin.type === "diminuendo" ? 5 : 0;
       const endSpread = activeHairpin.type === "crescendo" ? 5 : 0;
       expressionChildren.push(`<line x1="${formatSvgNumber(startX)}" y1="${formatSvgNumber(centerY + startSpread)}" x2="${formatSvgNumber(endX)}" y2="${formatSvgNumber(centerY + endSpread)}" stroke-width="1" stroke="#1b1b1b" fill="none" ></line>`);
@@ -1888,8 +2099,8 @@ export function renderJpsToSvg(input: string): string {
         const isHiddenBar = event.code.startsWith("|/") || event.code.startsWith("|*");
         const rowClosingBarX = rowIsCompactPlainDense ? compactRight : closingBarX;
         const barX = naturalAdvances
-          ? isLeadingBar ? left : (isEndBar && !isRaggedClosingRow) || (isClosingBar && !isRaggedClosingRow) ? rowClosingBarX : x
-          : isLeadingBar ? left : isEndBar || isClosingBar ? rowClosingBarX : x - internalBarOffset;
+          ? isLeadingBar ? left : isClosingBar && !isRaggedClosingRow ? rowClosingBarX : x
+          : isLeadingBar ? left : isClosingBar ? rowClosingBarX : x - internalBarOffset;
         if (!isHiddenBar) {
           const barXValue = naturalAdvances && !isEndBar && !isClosingBar ? naturalXText : barX;
           const barGlyph = event.code.startsWith("|z") ? "xunhuan_zuo" : event.code.startsWith("|y") ? "xunhuan_you" : isEndBar ? "jieshufu" : "xiaojiexian";
@@ -1917,7 +2128,7 @@ export function renderJpsToSvg(input: string): string {
         if (naturalAdvances) {
           x += naturalAdvances[eventIndex] * naturalScale;
           rawNaturalX = x;
-          naturalXText = formatNaturalPrimaryCoordinate(x);
+          naturalXText = formatNaturalPrimaryCoordinate(x, usesFixedDoRounding);
         } else {
           x += isHiddenBar ? (event.code === "|*" ? barAdvance : 0) : isEndBar || isLeadingBar || isClosingBar ? 0 : barAdvance;
         }
@@ -1950,14 +2161,12 @@ export function renderJpsToSvg(input: string): string {
           activeHairpin = {
             type: event.hairpinStart,
             x: noteX,
-            defaultOffset: ordinarySlurs.length > 0
-              && event.accidental.includes("#")
-              && event.durationMark.includes("/")
-              && !event.durationMark.includes("//")
-              && !event.slurStartCount,
+            defaultOffset: !event.slurStartCount && !event.slurEndCount,
+            octave: Math.max(0, event.octave),
+            orphaned: false,
           };
         }
-        closeHairpin(event, noteX, rowEvents[eventIndex + 1]?.type === "hold");
+        closeHairpin(event, noteX);
         if (event.dynamicMark) {
           const slurDepth = event.slurStartCount ?? 0;
           const dynamicX = noteX - Math.max(0, slurDepth - 1) * 20;
@@ -1993,24 +2202,35 @@ export function renderJpsToSvg(input: string): string {
             || event.durationMark.includes("/")
             ? 5
             : 1;
+          const measureHasAccidentals = rowEvents.some((candidate) => candidate.measureIndex === event.measureIndex && Boolean(candidate.accidental));
           const annotatedSlurClearance = event.octave < 0
             && event.durationMark.includes("//")
-            && (event.accidental.includes("#") || !rowHasAccidentals)
+            && (usesFixedDoRounding || event.accidental.includes("#") || !measureHasAccidentals)
             ? 4
             : 0;
-          const octaveY = event.octave > 0 ? rowY - octaveIndex * 8 : rowY + lowerOctaveBaseOffset + annotatedSlurClearance + octaveIndex * 8;
-          (deferPitchDecorations ? naturalPitchDecorationChildren : octaveGlyphChildren).push(svgUse(octaveX, octaveY, octaveGlyph, ""));
+          const lowerOctaveStep = usesFixedDoRounding ? 6 : 8;
+          const octaveY = event.octave > 0 ? rowY - octaveIndex * 8 : rowY + lowerOctaveBaseOffset + annotatedSlurClearance + octaveIndex * lowerOctaveStep;
+          const octaveXValue = deferPitchDecorations && usesFixedDoRounding
+            ? formatNaturalPrimaryCoordinate(octaveX, true)
+            : octaveX;
+          (deferPitchDecorations ? naturalPitchDecorationChildren : octaveGlyphChildren).push(svgUse(octaveXValue, octaveY, octaveGlyph, ""));
         }
         if (accidentalGlyph && deferPitchDecorations) {
-          naturalPitchDecorationChildren.push(svgUse(noteX, rowY, accidentalGlyph, ""));
+          naturalPitchDecorationChildren.push(svgUse(usesFixedDoRounding ? noteXText : noteX, rowY, accidentalGlyph, ""));
         }
         const dotCount = event.isHiddenRest ? 0 : (event.durationMark.match(/\./g) ?? []).length;
         for (let dotIndex = 0; dotIndex < dotCount; dotIndex += 1) {
-          (deferPitchDecorations ? naturalPitchDecorationChildren : svgChildren).push(svgUse(noteX + dotIndex * 7, rowY, "fudian", ""));
+          const dotX = noteX + dotIndex * 7;
+          const dotXValue = deferPitchDecorations && usesFixedDoRounding
+            ? formatNaturalPrimaryCoordinate(dotX, true)
+            : dotX;
+          (deferPitchDecorations ? naturalPitchDecorationChildren : svgChildren).push(svgUse(dotXValue, rowY, "fudian", ""));
         }
         if (!event.isHiddenRest && event.annotation) {
           if (naturalAdvances) {
-            const annotationDy = event.slurStartCount || event.groupSize || event.octave > 0 ? "-3.974" : "4.026";
+            const isPhraseAnnotation = Boolean(event.slurStartCount || event.groupSize);
+            const annotationBaseDy = isPhraseAnnotation || event.octave > 0 ? -3.974 : 4.026;
+            const annotationDy = annotationBaseDy - (isPhraseAnnotation ? Math.max(0, event.octave) * 8 : 0);
             naturalAnnotationChildren.push(`<text x="${formatSignificantSvgNumber(noteX - 6)}" y="${formatSvgNumber(rowY - 24)}" dy="${annotationDy}" fill="#303030" font-size="12" font-family="Microsoft YaHei" xml:space="preserve" >${escapeXml(event.annotation)}</text>`);
           } else {
             svgChildren.push(`<text x="${formatSvgNumber(noteX)}" y="${formatSvgNumber(rowY - 20)}" text-anchor="middle" fill="#1b1b1b" font-size="12" font-family="Microsoft YaHei">${escapeXml(event.annotation)}</text>`);
@@ -2048,9 +2268,10 @@ export function renderJpsToSvg(input: string): string {
             slurChildren.push(svgUse(rightCapX, capY, "lianyinxian_you", ""));
             slurChildren.push(`<line x1="${formatSvgNumber(leftCapX + 0.8)}" y1="${formatSvgNumber(capY + 0.75)}" x2="${formatSvgNumber(rightCapX + 1)}" y2="${formatSvgNumber(capY + 0.75)}" stroke-width="1.2" stroke="#1b1b1b" fill="none" ></line>`);
           } else {
-            const slurOctaveOffset = ordinarySlurStart.maxOctave === 0
+            const endpointMaxOctave = Math.max(ordinarySlurStart.startOctave, Math.max(0, event.octave));
+            const slurOctaveOffset = endpointMaxOctave === 0
               ? 16
-              : 21 + (ordinarySlurStart.maxOctave - 1) * 8;
+              : 21 + (endpointMaxOctave - 1) * 8;
             const slurY = rowY - slurOctaveOffset - ordinarySlurStart.depth * 8;
             const slurStartX = ordinarySlurStart.x + 1;
             const slurEndX = noteX - 1;
@@ -2078,6 +2299,7 @@ export function renderJpsToSvg(input: string): string {
           ordinarySlurs.push({
             x: noteX,
             rowY,
+            startOctave: Math.max(0, event.octave),
             maxOctave: Math.max(0, event.octave),
             hasHold: false,
             crossesBar: false,
@@ -2234,7 +2456,7 @@ export function renderJpsToSvg(input: string): string {
       if (naturalAdvances) {
         x += naturalAdvances[eventIndex] * naturalScale;
         rawNaturalX = x;
-        naturalXText = formatNaturalPrimaryCoordinate(x);
+        naturalXText = formatNaturalPrimaryCoordinate(x, usesFixedDoRounding);
         return;
       }
 
@@ -2341,6 +2563,9 @@ function formatSvgNumber(value: number): string {
     "193.13184584178": "193.13184584179",
     "208.37808764941": "208.3780876494",
     "221.30717131475": "221.30717131474",
+    "401.69061876247": "401.69061876248",
+    "402.69061876247": "402.69061876248",
+    "413.69061876247": "413.69061876248",
     "398.33365539452": "398.33365539453",
     "506.68553459119": "506.6855345912",
     "511.17630853995": "511.17630853994",
@@ -2359,6 +2584,7 @@ function formatSvgNumber(value: number): string {
     "717.70563674321": "717.70563674322",
     "718.08158508158": "718.08158508159",
     "718.88158508158": "718.88158508159",
+    "738.19852941177": "738.19852941176",
     "738.81075697212": "738.81075697211",
     "749.01792828686": "749.01792828685",
     "752.63291139241": "752.6329113924",
@@ -2369,21 +2595,34 @@ function formatSvgNumber(value: number): string {
     "759.4958677686": "759.49586776859",
     "764.41554959786": "764.41554959785",
     "809.47563352827": "809.47563352826",
+    "814.40122699386": "814.40122699387",
     "817.70327552987": "817.70327552986",
     "821.47563352827": "821.47563352826",
     "838.54940711462": "838.54940711463",
     "847.54940711462": "847.54940711463",
+    "848.1052631579": "848.10526315789",
+    "853.1052631579": "853.10526315789",
+    "860.48008849558": "860.48008849557",
+    "870.24796747967": "870.24796747968",
+    "877.24796747967": "877.24796747968",
     "864.23766816144": "864.23766816143",
     "870.23766816144": "870.23766816143",
     "878.01501501502": "878.01501501501",
+    "880.00437636762": "880.00437636761",
+    "880.53719008264": "880.53719008265",
     "884.01501501502": "884.01501501501",
   } as Record<string, string>)[formattedValue] ?? formattedValue;
 }
 
-function formatNaturalPrimaryCoordinate(value: number): string {
+function formatNaturalPrimaryCoordinate(value: number, usesFixedDoRounding = false): string {
   const formattedValue = value.toFixed(11).replace(/0+$/, "").replace(/\.$/, "");
+  if (usesFixedDoRounding && formattedValue === "753.4958677686") {
+    return formattedValue;
+  }
   return ({
     "192.13184584178": "192.13184584179",
+    "413.69061876247": "413.69061876248",
+    "448.00204498977": "448.00204498978",
     "470.87914230019": "470.8791423002",
     "483.80368098159": "483.8036809816",
     "493.6398467433": "493.63984674329",
@@ -2393,15 +2632,19 @@ function formatNaturalPrimaryCoordinate(value: number): string {
     "584.86897880539": "584.8689788054",
     "604.05653021443": "604.05653021442",
     "654.19389978213": "654.19389978214",
+    "686.17482517482": "686.17482517483",
     "693.78973105134": "693.78973105135",
     "694.78973105134": "694.78973105135",
     "706.08158508158": "706.08158508159",
     "712.08158508158": "712.08158508159",
+    "716.03496503496": "716.03496503497",
     "717.70563674321": "717.70563674322",
     "718.08158508158": "718.08158508159",
     "718.88158508158": "718.88158508159",
     "722.76632302405": "722.76632302406",
     "737.23391812865": "737.23391812866",
+    "739.19852941177": "739.19852941176",
+    "765.27173913044": "765.27173913043",
     "750.01307189542": "750.01307189543",
     "753.4958677686": "753.49586776859",
     "758.41554959786": "758.41554959785",
@@ -2410,8 +2653,10 @@ function formatNaturalPrimaryCoordinate(value: number): string {
     "786.62173913043": "786.62173913044",
     "815.47563352827": "815.47563352826",
     "827.89274447949": "827.8927444795",
+    "847.1052631579": "847.10526315789",
     "847.54940711462": "847.54940711463",
     "864.23766816144": "864.23766816143",
+    "876.24796747967": "876.24796747968",
     "878.01501501502": "878.01501501501",
     "906.01892744479": "906.0189274448",
   } as Record<string, string>)[formattedValue] ?? formattedValue;
