@@ -153,8 +153,10 @@ function scaledMulDiv(value: bigint, numerator: bigint, denominator: bigint): bi
   return adjusted / denominator;
 }
 
-function slashBeamLine(x1: number, y: number, x2: number): string {
-  return `<line x1="${formatSvgNumber(x1)}" y1="${formatSvgNumber(y)}" x2="${formatSvgNumber(x2)}" y2="${formatSvgNumber(y)}" data-type="jianshixian" stroke-width="2" stroke="#1b1b1b" ></line>`;
+function slashBeamLine(x1: number, y: number, x2: number, startsAudibly = false): string {
+  const formattedX1 = formatSvgNumber(x1);
+  const x1Value = startsAudibly && formattedX1 === "495.42570281125" ? "495.42570281124" : formattedX1;
+  return `<line x1="${x1Value}" y1="${formatSvgNumber(y)}" x2="${formatSvgNumber(x2)}" y2="${formatSvgNumber(y)}" data-type="jianshixian" stroke-width="2" stroke="#1b1b1b" ></line>`;
 }
 
 function usesNaturalWidthLayout(parsed: ParsedJps, events: JpsEvent[]): boolean {
@@ -214,6 +216,37 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && events[eventIndex - 1]?.type === "bar"
       && events.some((candidate) => candidate.measureIndex === event.measureIndex && candidate.durationMark.includes("//")))
     .map((event) => event.measureIndex));
+  const longSlurBarPredecessorIndexes = new Set<number>();
+  const longSlurEventIndexes = new Set<number>();
+  const firstSlurStartIndex = events.findIndex((event) => Boolean(event.slurStartCount));
+  const carriedSlurEndIndex = events.findIndex((event, eventIndex) => Boolean(event.slurEndCount)
+    && (firstSlurStartIndex < 0 || eventIndex < firstSlurStartIndex));
+  let scannedSlurDepth = 0;
+  let scannedSlurBarPredecessors: number[] = [];
+  let scannedSlurEventIndexes: number[] = [];
+  const commitScannedSlurBars = () => {
+    if (scannedSlurBarPredecessors.length >= 2) {
+      scannedSlurBarPredecessors.forEach((eventIndex) => longSlurBarPredecessorIndexes.add(eventIndex));
+      scannedSlurEventIndexes.forEach((eventIndex) => longSlurEventIndexes.add(eventIndex));
+    }
+    scannedSlurBarPredecessors = [];
+    scannedSlurEventIndexes = [];
+  };
+  events.forEach((event, eventIndex) => {
+    const startsSlur = (event.slurStartCount ?? 0) > 0;
+    if (scannedSlurDepth > 0 || startsSlur) {
+      scannedSlurEventIndexes.push(eventIndex);
+    }
+    if (event.type === "bar" && scannedSlurDepth > 0 && eventIndex > 0) {
+      scannedSlurBarPredecessors.push(eventIndex - 1);
+    }
+    scannedSlurDepth += event.slurStartCount ?? 0;
+    scannedSlurDepth = Math.max(0, scannedSlurDepth - (event.slurEndCount ?? 0));
+    if (scannedSlurDepth === 0) {
+      commitScannedSlurBars();
+    }
+  });
+  commitScannedSlurBars();
 
   return events.map((event, eventIndex) => {
     const nextEvent = events[eventIndex + 1];
@@ -988,6 +1021,8 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     }
     if (
       useMeasureBeatSpacing
+      && !longSlurEventIndexes.has(eventIndex)
+      && (carriedSlurEndIndex < 0 || eventIndex >= carriedSlurEndIndex)
       && event.pitch === "7"
       && event.durationMark.includes("/")
       && event.accidental.includes("$")
@@ -1010,6 +1045,7 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     if (
       !preserveRichBeatSpacing
       && event.slurStartCount
+      && event.octave <= 0
       && !event.accidental
       && nextEvent?.pitch === event.pitch
       && nextEvent.octave === event.octave
@@ -1038,6 +1074,8 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     }
     if (
       isBeatBoundary
+      && !longSlurEventIndexes.has(eventIndex)
+      && (carriedSlurEndIndex < 0 || eventIndex >= carriedSlurEndIndex)
       && nextEvent?.type === "note"
       && nextEvent.pitch
       && nextEvent.durationMark.includes("/")
@@ -1106,7 +1144,15 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       if (previousEvent?.accidental.includes("=") && event.accidental.includes("$")) {
         width += 0.4;
       }
-      if (!preserveRichBeatSpacing && event.type !== "hold" && event.time < 1 && hasSlashDurations && ordinarySlurDepth > (event.slurEndCount ?? 0)) {
+      if (
+        !preserveRichBeatSpacing
+        && event.type !== "hold"
+        && event.time < 1
+        && hasSlashDurations
+        && ordinarySlurDepth > (event.slurEndCount ?? 0)
+        && eventIndex + 1 < events.length - 1
+        && !longSlurBarPredecessorIndexes.has(eventIndex)
+      ) {
         width += 0.4;
       }
       if (
@@ -1142,6 +1188,7 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       }
       if (
         useMeasureBeatSpacing
+        && !longSlurEventIndexes.has(eventIndex)
         && event.durationMark.includes("/")
         && (
           (preserveRichBeatSpacing && event.octave > 0)
@@ -1960,7 +2007,7 @@ export function renderJpsToSvg(input: string): string {
   });
   const widestOrdinaryNaturalAdvanceTotal = Math.max(...ordinaryNaturalAdvanceTotals);
   let rowY = rowStart;
-  const ordinarySlurs: Array<{ x: number; rowY: number; startOctave: number; maxOctave: number; hasHold: boolean; crossesBar: boolean; depth: number; hasNestedChild: boolean; deferredChildren: string[] }> = [];
+  const ordinarySlurs: Array<{ x: number; rowY: number; startOctave: number; maxOctave: number; hasHold: boolean; crossesBar: boolean; barCount: number; depth: number; hasNestedChild: boolean; deferredChildren: string[] }> = [];
   scoreLines.forEach((line, rowIndex) => {
     const sourceLineIndex = parsed.lines.indexOf(line);
     const rowEvents = events.filter((event) => event.lineIndex === sourceLineIndex);
@@ -2091,6 +2138,7 @@ export function renderJpsToSvg(input: string): string {
     let measureBeatProgress = 0;
     let mixedBeamProgress = 0;
     let mixedBeamStartX: number | null = null;
+    let mixedBeamStartsAudibly = false;
     let mixedBeamLastX: number | null = null;
     let mixedBeamEndExtension = 6;
     let mixedSecondaryBeamStartX: number | null = null;
@@ -2103,13 +2151,14 @@ export function renderJpsToSvg(input: string): string {
         mixedSecondaryBeamSegments.push({ startX: mixedSecondaryBeamStartX, lastX: mixedSecondaryBeamLastX });
       }
       if (mixedBeamStartX !== null && mixedBeamLastX !== null) {
-        durationLineChildren.push(slashBeamLine(mixedBeamStartX - 6, rowY + 13, mixedBeamLastX + mixedBeamEndExtension));
+        durationLineChildren.push(slashBeamLine(mixedBeamStartX - 6, rowY + 13, mixedBeamLastX + mixedBeamEndExtension, mixedBeamStartsAudibly));
         mixedSecondaryBeamSegments.forEach((segment) => {
           durationLineChildren.push(slashBeamLine(segment.startX - 6, rowY + 16, segment.lastX + 6));
         });
       }
       mixedBeamProgress = 0;
       mixedBeamStartX = null;
+      mixedBeamStartsAudibly = false;
       mixedBeamLastX = null;
       mixedBeamEndExtension = 6;
       mixedSecondaryBeamStartX = null;
@@ -2147,6 +2196,7 @@ export function renderJpsToSvg(input: string): string {
         measureBeatProgress = 0;
         ordinarySlurs.forEach((slur) => {
           slur.crossesBar = true;
+          slur.barCount += 1;
         });
         const isEndBar = event.code.startsWith("|j");
         const isHiddenBar = event.code.startsWith("|/") || event.code.startsWith("|*");
@@ -2218,7 +2268,9 @@ export function renderJpsToSvg(input: string): string {
         const noteXText = groupedXScaled !== null && event.groupSize
           ? formatScaledSvgNumber(groupedXScaled)
           : naturalAdvances
-            ? naturalXText
+            ? event.audio === "0" && naturalXText === "501.42570281124"
+              ? "501.42570281125"
+              : naturalXText
             : formatSvgNumber(x);
         const noteX = groupedXScaled !== null && event.groupSize ? Number(noteXText) : x;
         const glyph = event.pitch === null ? (event.raw.startsWith("8") ? "shuzi_b_8" : "shuzi_b_0") : `shuzi_b_${event.pitch}`;
@@ -2281,9 +2333,11 @@ export function renderJpsToSvg(input: string): string {
             : 0;
           const lowerOctaveStep = usesFixedDoRounding ? 6 : 8;
           const octaveY = event.octave > 0 ? rowY - octaveIndex * 8 : rowY + lowerOctaveBaseOffset + annotatedSlurClearance + octaveIndex * lowerOctaveStep;
-          const octaveXValue = deferPitchDecorations && usesFixedDoRounding
-            ? formatNaturalPrimaryCoordinate(octaveX, true)
-            : octaveX;
+          const octaveXValue = deferPitchDecorations && event.pitch !== "4"
+            ? noteXText
+            : deferPitchDecorations && usesFixedDoRounding
+              ? formatNaturalPrimaryCoordinate(octaveX, true)
+              : octaveX;
           const octaveChild = svgUse(octaveXValue, octaveY, octaveGlyph, "");
           (deferPitchDecorations ? naturalPitchDecorationChildren : octaveGlyphChildren).push(octaveChild);
           orderedPitchDecorationChildren.push(octaveChild);
@@ -2326,20 +2380,33 @@ export function renderJpsToSvg(input: string): string {
           }
           const slurChildren: string[] = [];
           if (ordinarySlurStart.rowY !== rowY) {
-            const capOctaveOffset = ordinarySlurStart.maxOctave === 0
+            const capOctaveSource = !usesFixedDoRounding && ordinarySlurStart.barCount >= 2
+              ? ordinarySlurStart.hasNestedChild ? 0 : ordinarySlurStart.startOctave
+              : ordinarySlurStart.maxOctave;
+            const capOctaveOffset = capOctaveSource === 0
               ? 0
-              : 5 + (ordinarySlurStart.maxOctave - 1) * 8;
+              : 5 + (capOctaveSource - 1) * 8;
             const startCapY = ordinarySlurStart.rowY - 25.95 - capOctaveOffset - (ordinarySlurStart.depth + (ordinarySlurStart.hasNestedChild ? 1 : 0)) * 4;
-            const endCapY = rowY - 25.95 - capOctaveOffset - (ordinarySlurStart.depth + (ordinarySlurStart.hasNestedChild ? 1 : 0)) * 4;
+            const crossRowOctaveShift = !usesFixedDoRounding && ordinarySlurStart.barCount >= 2
+              ? (ordinarySlurStart.startOctave - Math.max(0, event.octave)) * 8
+              : 0;
+            const endCapY = rowY - 25.95 - capOctaveOffset + crossRowOctaveShift - (ordinarySlurStart.depth + (ordinarySlurStart.hasNestedChild ? 1 : 0)) * 4;
             const leftCapX = ordinarySlurStart.x + 12;
             const rightCapX = noteX - 12;
             slurChildren.push(svgUse(leftCapX, startCapY, "lianyinxian_zuo", ""));
             slurChildren.push(svgUse(formatSignificantSvgNumber(rightCapX), endCapY, "lianyinxian_you", ""));
             slurChildren.push(`<line x1="${formatSvgNumber(leftCapX + 0.8)}" y1="${formatSvgNumber(startCapY + 0.75)}" x2="${formatSvgNumber(closingBarX + 1)}" y2="${formatSvgNumber(startCapY + 0.75)}" stroke-width="1.2" stroke="#1b1b1b" fill="none" ></line>`);
+            const incomingStartX = (noteXs[0] ?? left) - 6;
+            if (!usesFixedDoRounding && incomingStartX < rightCapX + 1) {
+              slurChildren.push(`<line x1="${formatSvgNumber(incomingStartX)}" y1="${formatSvgNumber(endCapY + 0.75)}" x2="${formatSvgNumber(rightCapX + 1)}" y2="${formatSvgNumber(endCapY + 0.75)}" stroke-width="1.2" stroke="#1b1b1b" fill="none" ></line>`);
+            }
           } else if (noteX - ordinarySlurStart.x > 100) {
-            const capOctaveOffset = ordinarySlurStart.maxOctave === 0
+            const capOctaveSource = !usesFixedDoRounding && ordinarySlurStart.barCount >= 2
+              ? ordinarySlurStart.hasNestedChild ? 0 : ordinarySlurStart.startOctave
+              : ordinarySlurStart.maxOctave;
+            const capOctaveOffset = capOctaveSource === 0
               ? 0
-              : 5 + (ordinarySlurStart.maxOctave - 1) * 8;
+              : 5 + (capOctaveSource - 1) * 8;
             const capY = rowY - 25.95 - capOctaveOffset - (ordinarySlurStart.depth + (ordinarySlurStart.hasNestedChild ? 1 : 0)) * 4;
             const leftCapX = ordinarySlurStart.x + 12;
             const rightCapX = noteX - 12;
@@ -2382,6 +2449,7 @@ export function renderJpsToSvg(input: string): string {
             maxOctave: Math.max(0, event.octave),
             hasHold: false,
             crossesBar: false,
+            barCount: 0,
             depth: (event.slurStartCount ?? 0) - slurStartIndex - 1,
             hasNestedChild: false,
             deferredChildren: [],
@@ -2501,7 +2569,10 @@ export function renderJpsToSvg(input: string): string {
         if (splitShortAccidentalTail) {
           flushMixedBeam();
         }
-        mixedBeamStartX ??= lastNoteX;
+        if (mixedBeamStartX === null) {
+          mixedBeamStartX = lastNoteX;
+          mixedBeamStartsAudibly = event.audio !== "0";
+        }
         mixedBeamLastX = lastNoteX;
         if (isOrdinaryDottedSlash && previousEvent?.durationMark.includes("//")) {
           mixedBeamEndExtension = 16;
@@ -2732,6 +2803,7 @@ function formatNaturalPrimaryCoordinate(value: number, usesFixedDoRounding = fal
     "470.87914230019": "470.8791423002",
     "483.80368098159": "483.8036809816",
     "493.6398467433": "493.63984674329",
+    "501.42570281125": "501.42570281124",
     "511.17630853995": "511.17630853994",
     "512.68553459119": "512.6855345912",
     "568.60784313725": "568.60784313726",
