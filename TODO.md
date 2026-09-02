@@ -102,13 +102,13 @@
 
 ## Phase 9: Song Parity Closure
 
-- [ ] Run the complete cache-only song parity report after every feature cluster.
-- [ ] Fix the highest-frequency mismatch cluster first.
-- [ ] Add a concise bug-fix record for each resolved root cause.
-- [ ] Reach byte-for-byte equality for every song with a corresponding cached SVG.
+- [x] Run the complete cache-only song parity report after every feature cluster.
+- [x] Fix the highest-frequency mismatch cluster first.
+- [x] Add a concise bug-fix record for each resolved root cause.
+- [x] Reach byte-for-byte equality for every song with a corresponding cached SVG.
 - [ ] Document any spec ambiguity that cannot be inferred from the text or cached fixtures.
 
-Current verified baseline: 38 songs checked, 36 exact, 2 mismatched, and 0 missing caches. The exact song fixtures are `sandu-mojin.jps` through its canonical content-identical cache, `baihualin.jps`, `Londonderry.jps`, `LondonderryAir.jps`, `Londonderry-hanshan.jps`, `always-zhoushen.jps`, `047-keketuodemuyangren.jps`, `ganlanshu.jps`, `ganlanshu-qiyu.jps`, `guang-hui-sui-yue.jps`, `muge.jps`, `WaltzNo2.jps`, `tianyi.jps`, `hejiayi-barcarolle.jps`, `swan.jps`, `xiyangyang.jps`, `yidongdexin.jps`, `ren-jian-gong-ming.jps`, `ren-jian-gong-ming-bB.jps`, `yinjie-mojin-daokou.jps`, `sometime-when-it-rains.jps`, `sometime-when-it-rains-FixedDo.jps`, `sometime-when-it-rains-FixedDoH.jps`, `sometime-when-it-rains-FixedDoHK.jps`, `hejiayi-F-Swan-lake.jps`, `hejiayi-F-Swan-lake-alternativekeys.jps`, `hejiayi-swan-shengsan.jps`, `hejiayi-G-string-original.jps`, `hejiayi-G-string-alternativeKeys.jps`, `hejiayi-G-string-alternativeKeys2.jps`, `hejiayi-dream.jps`, `hejiayi-dream-AlternativeKey.jps`, `Haydn-Serenade-AlternativeKey.jps`, `Haydn-Serenade-Original.jps`, `huangwensheng-G-string.jps`, and `hongyan.jps`.
+Current verified baseline: 38 songs checked, 38 exact, 0 mismatched, and 0 missing caches. The exact song fixtures are `sandu-mojin.jps` through its canonical content-identical cache, `baihualin.jps`, `Londonderry.jps`, `LondonderryAir.jps`, `Londonderry-hanshan.jps`, `always-zhoushen.jps`, `047-keketuodemuyangren.jps`, `ganlanshu.jps`, `ganlanshu-qiyu.jps`, `guang-hui-sui-yue.jps`, `muge.jps`, `WaltzNo2.jps`, `tianyi.jps`, `hejiayi-barcarolle.jps`, `swan.jps`, `xiyangyang.jps`, `yidongdexin.jps`, `ren-jian-gong-ming.jps`, `ren-jian-gong-ming-bB.jps`, `yinjie-mojin-daokou.jps`, `sometime-when-it-rains.jps`, `sometime-when-it-rains-FixedDo.jps`, `sometime-when-it-rains-FixedDoH.jps`, `sometime-when-it-rains-FixedDoHK.jps`, `hejiayi-F-Swan-lake.jps`, `hejiayi-F-Swan-lake-alternativekeys.jps`, `hejiayi-swan-shengsan.jps`, `hejiayi-G-string-original.jps`, `hejiayi-G-string-alternativeKeys.jps`, `hejiayi-G-string-alternativeKeys2.jps`, `hejiayi-dream.jps`, `hejiayi-dream-AlternativeKey.jps`, `Haydn-Serenade-AlternativeKey.jps`, `Haydn-Serenade-Original.jps`, `huangwensheng-G-string.jps`, `hongyan.jps`, `tuerqi-jinxingqu-A.jps`, and `tuerqi-jinxingqu.jps`.
 
 ## Active Order
 
