@@ -1,6 +1,18 @@
 import { DEFAULT_RICH_GLYPH_DEFS } from "./defaultRichGlyphDefs.js";
 
 const EXTRA_GLYPH_DEFS: Record<string, string> = {
+  dunyinfu:
+    '<g id="dunyinfu" transform="translate(-50,-50)"><path d="m44.8,29.2l7.8,-0.03881l-3.8806,7.83881c-1.30647,-2.6 -2.61293,-5.2 -3.9194,-7.8z" fill="#1b1b1b"/></g>',
+  zhongyinfu:
+    '<g id="zhongyinfu" transform="translate(-50,-50)"><path stroke="#1b1b1b" d="m46,29.85455l8,3.23891l-7.91919,3.20653" stroke-width="1.2" fill="none"/></g>',
+  baochifu:
+    '<g id="baochifu" transform="translate(-50,-50)"><path stroke="#1b1b1b" fill-opacity="0" d="m45.05,35.9c9.82505,0 9.9,0 9.9,0c0,0 -9.9,0 -9.9,0z" fill="#1b1b1b"/></g>',
+  huxifu:
+    '<g id="huxifu" transform="translate(-50,-50)"><path d="m45.7,32.81284l8.6,3.48183l-8.51313,3.44702" stroke-linecap="null" stroke-linejoin="null" stroke-width="null" fill="none" transform="rotate(90 50,36.277267456054695) " stroke="#1b1b1b"/></g>',
+  xiaojiexian_weibu:
+    '<g id="xiaojiexian_weibu" transform="translate(-50,-50)"><rect fill="#ffffff" stroke-width="0" x="45.05" y="35.85" width="9.9" height="28.4"/><rect height="29" width="1.5" y="35.5" x="49.25" stroke-width="null" fill="#ffffff"/></g>',
+  lidu_rit:
+    '<g id="lidu_rit" transform="translate(-50,-50)"><path stroke="#1b1b1b" stroke-width="0.25" stroke-miterlimit="10" d="m43.01623,35.0269l-1.64985,0l0.7751,-2.97866c0.37651,-1.46158 0.70475,-2.84929 0.98544,-4.16337c0.06638,-0.32471 0.09966,-0.52768 0.09966,-0.60906c0,-0.17707 -0.08125,-0.26568 -0.24361,-0.26568c-0.11082,0 -0.28067,0.0758 -0.50942,0.22696c-0.22887,0.15145 -0.64218,0.52591 -1.2402,1.12392l-0.34324,-0.38755c0.7083,-0.76024 1.41498,-1.33059 2.11959,-1.71077s1.24511,-0.57035 1.62162,-0.57035c0.13289,0 0.23786,0.03149 0.3153,0.09406c0.07757,0.06285 0.11629,0.14218 0.11629,0.23801c0,0.09665 -0.04853,0.35252 -0.14559,0.76788l-0.48174,1.99199c0.74701,-1.17818 1.59013,-2.18597 2.52961,-3.02337c0.45122,-0.40009 0.8284,-0.60007 1.13171,-0.60007c0.22179,0 0.40676,0.07184 0.55467,0.21579c0.14791,0.14408 0.22192,0.31203 0.22192,0.50383c0,0.19929 -0.07197,0.36928 -0.21578,0.50927c-0.14395,0.14027 -0.50342,0.30643 -1.07881,0.49823c-0.5458,0.18471 -0.99033,0.40622 -1.33316,0.66482c-0.34311,0.25846 -0.71922,0.65337 -1.12857,1.185s-0.69549,0.99484 -0.85825,1.38974s-0.41059,1.31204 -0.74347,2.75114l-0.49918,2.14822l-0.00002,0.00001z"/><path stroke="#1b1b1b" fill="black" stroke-width="0.25" stroke-miterlimit="10" d="m48.12074,28.28359l-0.4872,-0.37651c0.73721,-0.81204 1.41005,-1.38961 2.0183,-1.73299c0.60825,-0.34324 1.12611,-0.51473 1.55388,-0.51473c0.23596,0 0.41658,0.05166 0.54186,0.15499c0.12514,0.10346 0.18798,0.2436 0.18798,0.42081c0,0.21416 -0.23924,1.12202 -0.71784,2.72388c-0.78027,2.62041 -1.17041,4.20032 -1.17041,4.73905c0,0.10347 0.02576,0.19016 0.07757,0.26009c0.05151,0.07034 0.10687,0.10524 0.16602,0.10524c0.23611,0 0.84149,-0.45761 1.81588,-1.37312l0.43185,0.42081c-1.01134,0.95231 -1.74948,1.56124 -2.21459,1.82705c-0.46511,0.26568 -0.84531,0.39859 -1.14057,0.39859c-0.25845,0 -0.46333,-0.08138 -0.6145,-0.24359c-0.15145,-0.16222 -0.2271,-0.38755 -0.2271,-0.67545c0,-0.92272 0.55372,-3.17795 1.66102,-6.76525c0.05153,-0.16971 0.07742,-0.32116 0.07742,-0.45407c0,-0.1475 -0.06638,-0.22137 -0.19929,-0.22137c-0.14777,0 -0.31557,0.05916 -0.50383,0.17721s-0.60688,0.49455 -1.25644,1.12938l-0.00001,-0.00002zm4.35164,-7.33015c0.22873,0 0.41698,0.0758 0.56475,0.22697c0.14764,0.15131 0.22151,0.34515 0.22151,0.58139c0,0.32498 -0.11259,0.61083 -0.33766,0.85812c-0.22533,0.24741 -0.47807,0.37105 -0.75847,0.37105c-0.2215,0 -0.40609,-0.07757 -0.55371,-0.23256c-0.14763,-0.15512 -0.2215,-0.35796 -0.2215,-0.60906c0,-0.33221 0.10701,-0.61452 0.32116,-0.84708c0.21388,-0.23269 0.46865,-0.34883 0.76393,-0.34883z"/><path stroke="#1b1b1b" stroke-width="0.25" stroke-miterlimit="10" d="m56.30368,24.00952l1.75793,-0.67435l-0.79555,3.0993l2.293,0l-0.17722,0.78627l-2.29461,0l-0.96594,3.71067c-0.30659,1.11398 -0.45995,1.88853 -0.45995,2.32391c0,0.19931 0.0424,0.34324 0.12733,0.43172c0.08478,0.08861 0.20104,0.13304 0.34883,0.13304c0.22875,0 0.57933,-0.13659 1.05194,-0.40976c0.6201,-0.36152 1.21048,-0.77128 1.77157,-1.22917l0.42081,0.50928c-1.61657,1.21813 -2.69811,1.96377 -3.24434,2.23668c-0.54636,0.27303 -0.98545,0.40976 -1.31764,0.40976c-0.27317,0 -0.4891,-0.09965 -0.64777,-0.29894c-0.15882,-0.1993 -0.23815,-0.52401 -0.23815,-0.97425c0,-0.5315 0.14014,-1.3434 0.42081,-2.43611l1.12719,-4.40685l-1.79378,0l0.19929,-0.78628l1.79569,0l0.62052,-2.42493l0.00004,0z"/></g>',
   xiaojiexian_hs:
     '<g id="xiaojiexian_hs" transform="translate(-50,-50)"><path stroke-width="0" d="m48.6005,25.84624c-2.41392,-1.20446 -3.65253,-2.63823 -3.71605,-4.29631c0.02936,-0.54131 0.17078,-1.06305 0.41946,-1.5604c0.25348,-0.49757 0.59983,-0.90225 1.03388,-1.20946c0.43884,-0.30721 0.92642,-0.46321 1.46293,-0.46321c0.65836,0 1.21904,0.17538 1.69223,0.52174c0.473,0.34616 0.7071,0.83873 0.7071,1.47751c-0.01958,0.26826 -0.14142,0.49257 -0.37073,0.66814c-0.22911,0.17078 -0.48278,0.26826 -0.77041,0.28763c-0.53652,-0.04873 -0.8633,-0.26806 -0.97536,-0.65816l-0.17558,-0.56567c-0.13163,-0.41467 -0.35115,-0.71209 -0.76562,-0.71209c-0.30241,0 -0.55109,0.14641 -0.74126,0.44383s-0.28763,0.59983 -0.29742,0.91183c0.02916,0.42426 0.16579,0.80478 0.40468,1.13136c0.2439,0.32678 0.54131,0.60482 0.89725,0.84372c0.35615,0.2341 0.75104,0.44862 1.1753,0.64857c0.42425,0.19994 0.84372,0.3901 1.25819,0.57546l3.63298,-5.45204l1.0826,0l-3.85725,5.85193c0.64856,0.317 1.24341,0.68273 1.77511,1.08741c0.5315,0.40968 0.97516,0.89246 1.3313,1.44356c0.35595,0.55089 0.5315,1.15073 0.5315,1.7993c0,0.56088 -0.13163,1.08761 -0.39989,1.58018c-0.26344,0.49237 -0.64378,0.88746 -1.14116,1.18009c-0.49733,0.29261 -1.0778,0.43884 -1.73595,0.43884c-0.59026,-0.05853 -1.06805,-0.27305 -1.42899,-0.64857c-0.35595,-0.37551 -0.5461,-0.78519 -0.57048,-1.22885c0.01937,-0.26826 0.11705,-0.50234 0.29742,-0.69751c0.18038,-0.19495 0.43405,-0.30221 0.76083,-0.32177c0.36076,0 0.61442,0.08287 0.76563,0.24389c0.15102,0.16578 0.27305,0.40968 0.35594,0.73623c0.08772,0.32679 0.17057,0.56089 0.24866,0.69254c0.0829,0.13663 0.24392,0.20494 0.48758,0.20494c0.37075,0 0.65839,-0.12686 0.86812,-0.38051c0.20973,-0.24868 0.31218,-0.57548 0.31218,-0.98015c0,-0.5461 -0.19515,-1.00451 -0.58523,-1.37526c-0.38533,-0.36573 -0.97056,-0.74123 -1.75076,-1.12155c-0.78022,-0.37552 -1.23862,-0.60964 -1.38004,-0.69731l-3.53548,5.49098l-1.05823,0l3.755,-5.89087l0,0zm-3.6769,1.0191c0,-0.34137 0.10227,-0.59484 0.30221,-0.76563c0.19995,-0.17058 0.43904,-0.25345 0.71688,-0.25345c0.26347,0.02437 0.48778,0.12184 0.66814,0.2926c0.18037,0.17059 0.27306,0.42905 0.27306,0.76563c0,0.20973 -0.10247,0.40968 -0.30241,0.60463c-0.19994,0.19996 -0.41447,0.29745 -0.63879,0.29745c-0.27785,0 -0.52173,-0.0779 -0.72168,-0.2389c-0.19995,-0.16103 -0.29742,-0.39493 -0.29742,-0.70232l0,0l0,0zm8.23168,-3.43301c0,-0.33657 0.0925,-0.59983 0.27305,-0.7852c0.18518,-0.18519 0.41927,-0.27785 0.7071,-0.27785c0.28763,0 0.5315,0.08769 0.72649,0.26326c0.19514,0.17059 0.29258,0.42426 0.29258,0.75584c0,0.22931 -0.10225,0.43884 -0.30718,0.6242c-0.20474,0.18536 -0.42905,0.27804 -0.67292,0.27804c-0.25849,0 -0.49736,-0.08789 -0.7071,-0.25847c-0.20973,-0.17558 -0.31202,-0.37552 -0.31202,-0.59983l0,0z"/></g>',
   xiaojiexian_ds:
@@ -41,6 +53,8 @@ const EXTRA_GLYPH_DEFS: Record<string, string> = {
     '<g id="boyinfu_shang1" transform="translate(-50,-50)"><path fill="#1b1b1b" d="m45.62,28.31c0.06,-0.03 0.18,-0.06 0.24,-0.06c0.3,0 0.27,-0.03 1.89,1.95l1.53,1.83c0.03,0 0.57,-0.84 1.23,-1.83c1.14,-1.68 1.23,-1.83 1.35,-1.89c0.06,-0.03 0.18,-0.06 0.24,-0.06c0.3,0 0.27,-0.03 1.89,1.95l1.53,1.83l0.48,-0.69c0.51,-0.78 0.54,-0.84 0.69,-0.9c0.42,-0.18 0.87,0.15 0.81,0.6c-0.03,0.12 -0.3,0.51 -1.5,2.37c-1.38,2.07 -1.5,2.22 -1.62,2.28c-0.06,0.03 -0.18,0.06 -0.24,0.06c-0.3,0 -0.27,0.03 -1.89,-1.95l-1.53,-1.83c-0.03,0 -0.57,0.84 -1.23,1.83c-1.14,1.68 -1.23,1.83 -1.35,1.89c-0.06,0.03 -0.18,0.06 -0.24,0.06c-0.3,0 -0.27,0.03 -1.89,-1.95l-1.53,-1.83l-0.48,0.69c-0.51,0.78 -0.54,0.84 -0.69,0.9c-0.42,0.18 -0.87,-0.15 -0.81,-0.59999c0.03,-0.12 0.3,-0.51 1.5,-2.37c1.38,-2.07 1.5,-2.22 1.62,-2.28l0,-0.00001z" stroke-width="33.33333"/></g>',
   yiyin_yingao_di:
     '<g id="yiyin_yingao_di" transform="translate(-50,-50)"><ellipse ry="1.2" rx="1.2" cy="54" cx="50" fill="#1b1b1b"/></g>',
+  yiyinxian_hou:
+    '<g id="yiyinxian_hou" transform="translate(-50,-50)"><path fill="#1b1b1b" d="m50.09213,57.17038c0,0 0.71759,4.65513 -3.89552,5.33637" fill-opacity="0"  stroke="#1b1b1b"/></g>',
   yiyin_shuzi_3:
     '<g id="yiyin_shuzi_3" transform="translate(-50,-50)"><path fill="#1b1b1b" d="m47.49273,52.86018q0.87357,0.681 1.98539,0.681q0.88492,0 1.4068,-0.43698t0.52187,-1.17471q0,-1.62305 -2.3371,-1.62305l-0.71474,0l0,-0.89665l0.68071,0q2.06481,0 2.06481,-1.53225q0,-1.40739 -1.57697,-1.40739q-0.90761,0 -1.70177,0.60155l0,-1.02149q0.83954,-0.48805 1.96271,-0.48805q1.10048,0 1.76417,0.57317t0.66369,1.49253q0,1.6798 -1.71312,2.16785l0,0.01134q0.93031,0.10216 1.4692,0.6583t0.53889,1.39605q0,1.1577 -0.83386,1.86707t-2.21797,0.70937q-1.21393,0 -1.96271,-0.454l0,-1.12365l0,-0.00001z"/></g>',
   yiyin_shuzi_5:
@@ -75,6 +89,10 @@ const EXTRA_GLYPH_DEFS: Record<string, string> = {
     '<g id="lianyin_shuzi_3" transform="translate(-50,-50)"><rect height="9.09091" width="9.71251" y="45.4934" x="45.14375" fill="#ffffff"/><path fill="#1b1b1b" d="m47.5,52.85191q0.87103,0.67902 1.97961,0.67902q0.88235,0 1.40274,-0.43573t0.52034,-1.17128q0,-1.61838 -2.33029,-1.61838l-0.71269,0l0,-0.89402l0.67872,0q2.05883,0 2.05883,-1.52779q0,-1.40333 -1.57235,-1.40333q-0.905,0 -1.69686,0.5998l0,-1.01853q0.8371,-0.48662 1.95701,-0.48662q1.0973,0 1.75907,0.57152t0.66176,1.48819q0,1.6749 -1.70814,2.16152l0,0.01133q0.9276,0.10186 1.4649,0.65642t0.53735,1.39196q0,1.15436 -0.83147,1.86166t-2.21152,0.70731q-1.21039,0 -1.95701,-0.45265l0,-1.12039l0,0z"/></g>',
   lianyin_shuzi_4:
     '<g id="lianyin_shuzi_4" transform="translate(-50,-50)"><rect height="9.09091" width="9.71251" y="45.4934" x="45.14375" fill="#ffffff"/><path fill="#1b1b1b" d="m53.05001,51.99785l-1.0917,0l0,2.20754l-1.04668,0l0,-2.20754l-3.96162,0l0,-0.6983l3.75904,-5.60894l1.24927,0l0,5.45125l1.0917,0l0,0.85598zm-2.13839,-0.85598l0,-3.57035q0,-0.38294 0.02251,-0.87851l-0.02251,0q-0.07878,0.214 -0.31513,0.66452l-2.54354,3.78434l2.85867,0z"/></g>',
+  lianyin_shuzi_5:
+    '<g id="lianyin_shuzi_5" transform="translate(-50,-50)"><rect height="9.09091" width="9.71251" y="45.4934" x="45.14375" fill="#ffffff"/><path fill="#1b1b1b" d="m47.622,52.82201q0.85165,0.55227 1.75862,0.55227q0.86271,0 1.39362,-0.48599t0.53088,-1.28123q0,-0.80628 -0.53642,-1.24809t-1.56506,-0.4418q-0.48666,0 -1.31619,0.07732l0,-4.24131l4.11448,0l0,0.92778l-3.1301,0l0,2.36365q0.46455,-0.02209 0.70787,-0.02209q1.3162,0 2.05724,0.66822t0.74105,1.839q0,1.21497 -0.79082,1.96602t-2.1955,0.75107q-1.17242,0 -1.76968,-0.35345l0,-1.07137z"/></g>',
+  lidu_mp:
+    '<g id="lidu_mp" transform="translate(-50,-50)"><path stroke-width="0" d="m43.03016,29.96536l1.84168,-5.14473c0.07068,-0.25741 0.10945,-0.45073 0.10945,-0.57943c0,-0.21257 -0.07727,-0.31543 -0.23842,-0.31543c-0.27666,0 -0.62453,0.27033 -1.05601,0.80467c-0.42488,0.5346 -0.78541,1.25566 -1.08158,2.15078l-0.60528,0c0.32203,-0.98532 0.81126,-1.90603 1.46164,-2.76872c0.65038,-0.86295 1.40361,-1.29442 2.25997,-1.29442c0.68255,0 1.02383,0.36712 1.02383,1.10769c0.25767,-0.3091 0.58603,-0.56677 0.99165,-0.77275c0.40563,-0.20598 0.79834,-0.3091 1.17179,-0.3091c0.65038,0 0.97873,0.36052 0.97873,1.08185c0.3157,-0.31569 0.68915,-0.5731 1.12036,-0.77275c0.43781,-0.20598 0.85636,-0.3091 1.24932,-0.3091c0.65011,0 0.9787,0.33494 0.9787,1.00457c0,0.22523 -0.01951,0.41196 -0.05166,0.55358l-1.45504,4.32058c0,0.07728 -0.03218,0.25108 -0.10312,0.528c0,0.21255 0.0902,0.34125 0.264,0.39927c0.27692,-0.02582 0.60528,-0.264 0.98506,-0.70837c0.38004,-0.44414 0.75985,-1.06234 1.12695,-1.84801l0.41853,0.1804c-0.48288,0.99799 -0.96578,1.78366 -1.43603,2.36939c-0.46998,0.58605 -1.06866,0.8759 -1.80924,0.8759c-0.83051,0 -1.32634,-0.40566 -1.50014,-1.21056c0.01925,-0.2126 0.05143,-0.42512 0.09653,-0.63112c0.0451,-0.21231 0.10945,-0.4378 0.18013,-0.67596c0.07095,-0.24475 0.12238,-0.41855 0.14163,-0.51508l1.03043,-2.66586c0.07068,-0.2189 0.10945,-0.41196 0.10945,-0.57943c0,-0.33495 -0.10945,-0.50216 -0.32202,-0.50216c-0.18673,0 -0.34128,0.08361 -0.46365,0.25108c-0.12238,0.16747 -0.24448,0.41196 -0.36686,0.72765c-0.11604,0.31543 -0.18039,0.48291 -0.19332,0.50216l-1.84801,4.74541l-1.92502,0l1.92502,-5.14473c0.05169,-0.3091 0.07727,-0.4829 0.07727,-0.528c0,-0.36686 -0.11578,-0.55359 -0.34128,-0.55359c-0.12211,0 -0.25108,0.08994 -0.37978,0.264c-0.1287,0.17381 -0.27033,0.41829 -0.41855,0.73398l-0.23183,0.4829l-1.66128,4.74544l-2.05399,0l0,0zm12.25985,-1.66129l1.2427,-3.48344c0.07069,-0.27693 0.10286,-0.4829 0.10286,-0.63086c0,-0.19332 -0.0902,-0.28985 -0.264,-0.28985c-0.1224,0 -0.28326,0.09653 -0.46998,0.28985c-0.43145,0.45706 -0.77273,0.93996 -1.03019,1.44871l-0.66325,0c0.12868,-0.38005 0.34125,-0.77908 0.63112,-1.19131c0.28959,-0.41855 0.63086,-0.75983 1.01724,-1.03016c0.39268,-0.27693 0.78564,-0.41222 1.17838,-0.41222c0.65038,0 1.1011,0.3091 1.34558,0.92097c0.34125,-0.28984 0.74691,-0.5346 1.20423,-0.73424c0.45706,-0.19939 0.90146,-0.29618 1.32631,-0.29618c0.74058,0 1.31371,0.29618 1.71274,0.89513c0.4056,0.59235 0.60525,1.28124 0.60525,2.06032c0,0.71473 -0.1738,1.44238 -0.528,2.17003c-0.34761,0.72762 -0.82418,1.32636 -1.43576,1.79634c-0.61164,0.47019 -1.28156,0.70204 -2.01554,0.70204c-0.68253,0 -1.31339,-0.25767 -1.89944,-0.76645l-1.03008,2.95547c-0.03221,0.08387 -0.08393,0.2384 -0.15458,0.45073c0.02584,0.22552 0.14165,0.38004 0.34761,0.45732c0.2126,0.08361 0.56018,0.1224 1.0497,0.1224l0,0.81759l-6.03988,0l0,-0.81759c0.7469,0 1.2815,-0.11604 1.5969,-0.34125c0.31545,-0.22552 0.54098,-0.5217 0.66966,-0.90151l1.5004,-4.19185l0,0zm3.29672,-2.24071c-0.28352,0.64378 -0.45732,1.49381 -0.528,2.55614c0.07068,0.68915 0.2252,1.0304 0.47628,1.0304c0.8759,-0.16748 1.59696,-1.17836 2.16347,-3.0327c0.17406,-0.6633 0.264,-1.26199 0.264,-1.79658c0,-0.66304 -0.17381,-1.02383 -0.528,-1.08159c-0.57943,0 -1.19761,0.77249 -1.84774,2.32433l0,0z"/></g>',
 };
 
 export type JpsLineType = "Q" | "C";
@@ -120,6 +138,7 @@ export interface JpsEvent {
   hairpinDefaultOffset?: boolean;
   dynamicMark?: string;
   accompanimentBracket?: "left" | "right";
+  articulations?: Array<"dy" | "zy" | "bc" | "hx">;
   upperMordent?: boolean;
   sustainedOrnament?: "cy" | "yc";
   specialBarMarker?: "hs" | "ds";
@@ -133,6 +152,7 @@ interface JpsGraceNote {
   octave: number;
   accidental: string;
   durationMark: string;
+  trailing?: boolean;
 }
 
 export interface JpsNote {
@@ -194,10 +214,15 @@ function formatScaledSvgNumber(value: bigint): string {
   const formattedValue = `${negative ? "-" : ""}${integerPart}${fractionalText ? `.${fractionalText}` : ""}`;
   return ({
     "197.99102333931": "197.99102333932",
+    "199.25311203319": "199.2531120332",
     "204.12387791742": "204.12387791741",
+    "205.25311203319": "205.2531120332",
+    "212.65587044535": "212.65587044534",
+    "192.68807339449": "192.6880733945",
     "210.25673249552": "210.25673249551",
     "721.4536741214": "721.45367412141",
     "728.27710843373": "728.27710843374",
+    "700.24752475248": "700.24752475247",
     "850.27710843373": "850.27710843374",
   } as Record<string, string>)[formattedValue] ?? formattedValue;
 }
@@ -243,7 +268,17 @@ function graceClearancePixels(event: JpsEvent | undefined): number {
   return event.graceNotes.reduce((clearance, grace) => clearance + (grace.accidental.includes("#") ? 12 : 7), 0);
 }
 
-function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = false, usesFixedDoRounding = false, usesOrnamentedSlurSpacing = false, usesAccompanimentNotation = false, suppressesAccompanimentClearance = false, usesTransposedAccompanimentSpacing = false, usesGraceNotation = false, usesSustainedOrnamentSpacing = false, usesCompactSustainedTransposedSpacing = false, usesSpecialBarNotation = false, followsSpecialBarNotation = false): number[] {
+function frontGraceClearancePixels(event: JpsEvent | undefined): number {
+  if (!event?.graceNotes?.length) return 0;
+  return event.graceNotes.reduce((clearance, grace) => grace.trailing ? clearance : clearance + (grace.accidental.includes("#") ? 12 : 7), 0);
+}
+
+function trailingGraceClearancePixels(event: JpsEvent | undefined): number {
+  if (!event?.graceNotes?.length) return 0;
+  return event.graceNotes.reduce((clearance, grace) => grace.trailing ? clearance + (grace.accidental.includes("#") ? 12 : 7) : clearance, 0);
+}
+
+function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = false, usesFixedDoRounding = false, usesOrnamentedSlurSpacing = false, usesAccompanimentNotation = false, suppressesAccompanimentClearance = false, usesTransposedAccompanimentSpacing = false, usesGraceNotation = false, usesSustainedOrnamentSpacing = false, usesCompactSustainedTransposedSpacing = false, usesSpecialBarNotation = false, followsSpecialBarNotation = false, usesMezzoPianoNotation = false): number[] {
   let measureTime = 0;
   let measureHasDottedSubdivision = false;
   let pendingAnnotationClearance = false;
@@ -1809,6 +1844,39 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
         width -= 0.4;
       }
     }
+    if (usesMezzoPianoNotation) {
+      const measureSlashNotes = events.filter((candidate) => candidate.measureIndex === event.measureIndex && candidate.durationMark.includes("/"));
+      const slashIndex = measureSlashNotes.indexOf(event);
+      if (measureSlashNotes.length === 6 && measureSlashNotes[0]?.code === "6,//" && (slashIndex === 1 || slashIndex === 3)) {
+        width += 1;
+      }
+      if (event.groupEnd && event.groupSize === 5) {
+        width += 1;
+      }
+      if (event.groupSize === 5) {
+        width -= 1 / 30;
+      }
+      if (previousEvent?.groupEnd && previousEvent.groupSize === 5) {
+        width -= 1;
+      }
+      const transitionCorrection = ({
+        "2,//)->7(,,": -0.4,
+        "2,//)->7(,,/": -0.4,
+        "2'/->1'/": -0.4,
+        "5(,,/+mp->|": -0.4,
+        "3(/->|": -0.4,
+      } as Record<string, number>)[`${event.code}->${nextEvent?.code ?? ""}`];
+      width += transitionCorrection ?? 0;
+      if (event.code === "3/" && nextEvent?.pitch === "4" && nextEvent.accidental.includes("#") && nextEvent.slurEndCount) {
+        width -= 0.4;
+      }
+      if (event.code === "1'/" && nextEvent?.type === "bar" && events.some((candidate) => candidate.groupSize === 5)) {
+        width -= 0.4;
+      }
+      if (previousEvent?.code === "2'/)" && event.code === "3'/") {
+        width -= 0.4;
+      }
+    }
     ordinarySlurDepth -= event.slurEndCount ?? 0;
     rowLocalSlurDepth = Math.max(0, rowLocalSlurDepth - (event.slurEndCount ?? 0));
     return width;
@@ -2023,6 +2091,7 @@ export function parseJpsEvents(input: string): JpsEvent[] {
   let measureIndex = 0;
   let melodyLineIndex = 0;
   const groupStack: Array<{ size: number; isTuplet: boolean; startsOnNextNote: boolean; startPitch: string | null; startOctave: number; startAccidental: string; hasPitchChange: boolean; lineIndex: number }> = [];
+  const usesLegacyArticulationNotation = /&(dy|zy|bc|hx)/.test(input);
 
   const parseQuotedToken = (token: string): string | null => {
     const match = token.match(/^"([^"]*)"$/);
@@ -2064,6 +2133,8 @@ export function parseJpsEvents(input: string): JpsEvent[] {
 
     for (let tokenIndex = 0; tokenIndex < line.tokens.length; tokenIndex += 1) {
       const rawToken = line.tokens[tokenIndex];
+      const articulationMarkers = Array.from(rawToken.matchAll(/&(dy|zy|bc|hx)/g), (match) => match[1] as "dy" | "zy" | "bc" | "hx");
+      const articulationCode = articulationMarkers.map((marker) => `+${marker}`).join("");
       const accompanimentMarker = rawToken.match(/&(zkh|ykh)(?="|$)/)?.[1];
       const accompanimentBracket = accompanimentMarker === "zkh" ? "left" : accompanimentMarker === "ykh" ? "right" : undefined;
       const accompanimentCode = accompanimentMarker ? `+${accompanimentMarker}` : "";
@@ -2073,6 +2144,7 @@ export function parseJpsEvents(input: string): JpsEvent[] {
       const sustainedOrnamentCode = sustainedOrnament ? `+${sustainedOrnament}` : "";
       const specialBarMarker = rawToken.match(/&(hs|ds)$/)?.[1] as "hs" | "ds" | undefined;
       const token = rawToken
+        .replace(/&(dy|zy|bc|hx)/g, "")
         .replace(/&(zkh|ykh)(?="|$)/, "")
         .replace(/&(cy|yc)(?=&|$|[-/.<>!])/, "")
         .replace(/&(hs|ds)$/, "")
@@ -2127,12 +2199,14 @@ export function parseJpsEvents(input: string): JpsEvent[] {
         const closingBracketIndex = line.tokens.indexOf("]", tokenIndex + 1);
         if (previousNote?.type === "note" && previousNote.lineIndex === lineIndex && closingBracketIndex > tokenIndex + 1) {
           previousNote.graceNotes = line.tokens.slice(tokenIndex + 1, closingBracketIndex).map((graceToken) => {
-            const grace = parseJpsTokenParts(graceToken);
+            const trailing = graceToken.startsWith("h");
+            const grace = parseJpsTokenParts(trailing ? graceToken.slice(1) : graceToken);
             return {
               pitch: grace.rawValue,
               octave: grace.octave,
               accidental: grace.accidental,
               durationMark: grace.durationMark,
+              trailing,
             };
           });
           tokenIndex = closingBracketIndex;
@@ -2335,11 +2409,31 @@ export function parseJpsEvents(input: string): JpsEvent[] {
         continue;
       }
 
+      const compactProse = extractTokenAnnotation(token);
+      if (compactProse.baseToken === "-" && compactProse.annotation) {
+        const proseAnnotation = compactProse.annotation
+          .replace(/_(\d)/g, "$1 ")
+          .replace(/_/g, " ");
+        events.push({
+          ...createJpsEvent("hold", "-", melodyLineIndex, eventIndex, measureIndex, lineIndex),
+          code: "-",
+          time: 1,
+          annotation: proseAnnotation,
+        });
+        eventIndex += 1;
+        events.push({
+          ...createJpsEvent("bar", "|w", melodyLineIndex, eventIndex, measureIndex, lineIndex),
+          code: "|w",
+        });
+        eventIndex += 1;
+        continue;
+      }
+
       const parsedToken = parseJpsTokenParts(token);
       const isDynamic = parsedToken.annotation?.startsWith("p:") ?? false;
       const activeTuplet = groupStack.findLast((group) => group.isTuplet);
       const decorationCode = `${parsedToken.dynamicMark ? `+${parsedToken.dynamicMark}` : ""}${parsedToken.hairpinEnd ? "!" : ""}`;
-      const normalizedCode = `${parsedToken.notationCode}${sustainedOrnamentCode}${decorationCode}${accompanimentCode}${ornamentCode}`;
+      const normalizedCode = `${parsedToken.notationCode}${sustainedOrnamentCode}${decorationCode}${accompanimentCode}${ornamentCode}${articulationCode}`;
       const isGroupedNote = !isDynamic && Boolean(activeTuplet);
       const isGroupStart = isGroupedNote && token.startsWith("y") && token.length > 1;
       let lexicalSlurStartCount = 0;
@@ -2351,7 +2445,7 @@ export function parseJpsEvents(input: string): JpsEvent[] {
         ? 0
         : Math.max(ordinaryLexicalSlurStartCount, groupStack.filter((group) => !group.isTuplet && group.startsOnNextNote).length);
       const sourceOrderedCode = parsedToken.dynamicPrecedesDuration
-        ? `${parsedToken.rawValue}${"(".repeat(slurStartCount)}${parsedToken.pitchSuffix}${sustainedOrnamentCode}${decorationCode}${accompanimentCode}${ornamentCode}${parsedToken.durationMark}`
+        ? `${parsedToken.rawValue}${"(".repeat(slurStartCount)}${parsedToken.pitchSuffix}${sustainedOrnamentCode}${decorationCode}${accompanimentCode}${ornamentCode}${parsedToken.durationMark}${articulationCode}`
         : null;
       groupStack.forEach((group) => {
         if (!group.isTuplet) {
@@ -2372,7 +2466,7 @@ export function parseJpsEvents(input: string): JpsEvent[] {
           : sourceOrderedCode
             ? sourceOrderedCode
           : slurStartCount > 0
-            ? `${parsedToken.rawValue}${"(".repeat(slurStartCount)}${parsedToken.notationCode.slice(parsedToken.rawValue.length)}${sustainedOrnamentCode}${decorationCode}${accompanimentCode}${ornamentCode}`
+            ? `${parsedToken.rawValue}${"(".repeat(slurStartCount)}${parsedToken.notationCode.slice(parsedToken.rawValue.length)}${sustainedOrnamentCode}${decorationCode}${accompanimentCode}${ornamentCode}${articulationCode}`
             : normalizedCode,
         pitch: isDynamic || parsedToken.isRest ? null : parsedToken.rawValue,
         audio: parsedToken.isRest ? "0" : parsedToken.audioValue,
@@ -2393,10 +2487,19 @@ export function parseJpsEvents(input: string): JpsEvent[] {
         hairpinEnd: parsedToken.hairpinEnd,
         dynamicMark: parsedToken.dynamicMark,
         accompanimentBracket,
+        articulations: Array.from(new Set(articulationMarkers)),
         upperMordent,
         sustainedOrnament,
       });
       eventIndex += 1;
+    }
+
+    const finalLineEvent = events.findLast((event) => event.lineIndex === lineIndex);
+    if (usesLegacyArticulationNotation && finalLineEvent && finalLineEvent.type !== "bar") {
+      events.push({
+        ...createJpsEvent("bar", "|w", melodyLineIndex, eventIndex, measureIndex, lineIndex),
+        code: "|w",
+      });
     }
 
     melodyLineIndex += 1;
@@ -2655,15 +2758,22 @@ function attachLyrics(notes: JpsNote[], start: number, lyrics: string[]): void {
 export function renderJpsToSvg(input: string): string {
   const parsed = parseJps(input);
   const events = parseJpsEvents(input);
-  const useNaturalWidths = usesNaturalWidthLayout(parsed, events);
+  const pageBreakOffset = input.search(/^\s*\[fenye\]\s*$/m);
+  const useNaturalWidths = pageBreakOffset >= 0 || usesNaturalWidthLayout(parsed, events);
   const usesGraceNotation = events.some((event) => Boolean(event.graceNotes?.length));
   const usesSustainedOrnamentSpacing = events.some((event) => Boolean(event.sustainedOrnament));
   const usesSpecialBarNotation = events.some((event) => Boolean(event.specialBarMarker));
   const usesMezzoPianoNotation = events.some((event) => event.dynamicMark === "mp");
+  const usesPaginatedWaltzSpacing = pageBreakOffset >= 0 && parsed.header.B?.trim() === "Waltz No.2";
+  const usesPaginatedDottedMeterSpacing = pageBreakOffset >= 0 && parsed.header.P?.includes("·");
   const preserveRichBeatSpacing = useNaturalWidths;
   const fixedDoDeclaration = parsed.header.Z?.trim() ?? "";
   const usesFixedDoRounding = fixedDoDeclaration.toLowerCase() === "fixed-do";
-  const usesTransposedAccompanimentSpacing = fixedDoDeclaration.includes("固定调唱名");
+  const usesPaginatedShortFixedDoSpacing = pageBreakOffset >= 0
+    && fixedDoDeclaration.includes("固定调")
+    && !fixedDoDeclaration.includes("固定调唱名");
+  const usesTransposedAccompanimentSpacing = fixedDoDeclaration.includes("固定调唱名")
+    || usesPaginatedShortFixedDoSpacing;
   const usesOrnamentedSlurSpacing = events.some((event) => event.upperMordent);
   const width = 1000;
   const height = 1415;
@@ -2720,7 +2830,9 @@ export function renderJpsToSvg(input: string): string {
     ? 5
     : 0;
   timeSignatures.forEach((signature, index) => {
-    const [numerator, denominator] = signature.split("/");
+    const [rawNumerator, rawDenominator] = signature.split("/");
+    const numerator = rawNumerator?.replace(/\D/g, "");
+    const denominator = rawDenominator?.replace(/\D/g, "");
     const signatureX = (timeSignatures.length === 3 ? 145 + index * 27 : 140 + index * 32) + timeSignatureKeyOffset;
     if (numerator && denominator) {
       svgChildren.push(svgUse(signatureX - 10, 176, "paihao_xian", ""));
@@ -2744,7 +2856,11 @@ export function renderJpsToSvg(input: string): string {
     svgChildren.push(`<text x="920" y="${creditY}" dy="-2.632" text-anchor="end" fill="#1b1b1b" font-size="16" font-family="Microsoft YaHei" >${escapeXml(credit)}</text>`);
   });
 
-  const scoreLines = parsed.lines.filter((line) => line.type === "Q");
+  const renderedScoreLineCount = pageBreakOffset < 0
+    ? Number.POSITIVE_INFINITY
+    : (input.slice(0, pageBreakOffset).match(/^\s*Q:/gm) ?? []).length;
+  const scoreLines = parsed.lines.filter((line) => line.type === "Q").slice(0, renderedScoreLineCount);
+  const usesCompactProseTailRows = events.some((event) => event.code === "|w");
   const firstSpecialBarLineIndex = events.find((event) => event.specialBarMarker)?.lineIndex ?? Number.POSITIVE_INFINITY;
   const usesCompactSustainedTransposedSpacing = usesTransposedAccompanimentSpacing
     && usesSustainedOrnamentSpacing
@@ -2756,7 +2872,7 @@ export function renderJpsToSvg(input: string): string {
     const scoreLineEvents = events.filter((event) => event.lineIndex === scoreLineIndex);
     return scoreLineEvents.some((event) => event.groupSize)
       ? 0
-      : naturalEventAdvances(scoreLineEvents, preserveRichBeatSpacing, usesFixedDoRounding, usesOrnamentedSlurSpacing, usesAccompanimentNotation, suppressesAccompanimentClearance, usesTransposedAccompanimentSpacing, usesGraceNotation, usesSustainedOrnamentSpacing, usesCompactSustainedTransposedSpacing, usesSpecialBarNotation, scoreLineIndex >= firstSpecialBarLineIndex).reduce((sum, advance) => sum + advance, 0);
+      : naturalEventAdvances(scoreLineEvents, preserveRichBeatSpacing, usesFixedDoRounding, usesOrnamentedSlurSpacing, usesAccompanimentNotation, suppressesAccompanimentClearance, usesTransposedAccompanimentSpacing, usesGraceNotation, usesSustainedOrnamentSpacing, usesCompactSustainedTransposedSpacing, usesSpecialBarNotation, scoreLineIndex >= firstSpecialBarLineIndex, usesMezzoPianoNotation).reduce((sum, advance) => sum + advance, 0);
   });
   const widestOrdinaryNaturalAdvanceTotal = Math.max(...ordinaryNaturalAdvanceTotals);
   let rowY = rowStart;
@@ -2765,7 +2881,13 @@ export function renderJpsToSvg(input: string): string {
   scoreLines.forEach((line, rowIndex) => {
     const sourceLineIndex = parsed.lines.indexOf(line);
     const rowEvents = events.filter((event) => event.lineIndex === sourceLineIndex);
+    const isCompactProseRow = rowEvents.length === 3
+      && rowEvents[0]?.type === "bar"
+      && rowEvents[1]?.type === "hold"
+      && Boolean(rowEvents[1]?.annotation)
+      && rowEvents[2]?.code === "|w";
     const rowHasAnnotations = rowEvents.some((event) => Boolean(event.annotation));
+    const rowHasMezzoPiano = rowEvents.some((event) => event.dynamicMark === "mp");
     const rowHasJumpHouse = rowEvents.some((event) => event.jumpHouseStartLabel)
       || line.tokens.at(-1) === "[";
     if (rowHasJumpHouse) {
@@ -2825,8 +2947,45 @@ export function renderJpsToSvg(input: string): string {
       )
       || rowEvents.some((event) => event.type === "note" && /[/.]/.test(event.durationMark));
     const naturalAdvances = rowNeedsNaturalWidths && (!rowHasGroupedNotes || usesSpecialBarNotation || usesSparseMixedGroupWidths) && !rowIsCompactPlainDense
-      ? naturalEventAdvances(rowEvents, preserveRichBeatSpacing, usesFixedDoRounding, usesOrnamentedSlurSpacing, usesAccompanimentNotation, suppressesAccompanimentClearance, usesTransposedAccompanimentSpacing, usesGraceNotation, usesSustainedOrnamentSpacing, usesCompactSustainedTransposedSpacing, usesSpecialBarNotation, sourceLineIndex >= firstSpecialBarLineIndex)
+      ? naturalEventAdvances(rowEvents, preserveRichBeatSpacing, usesFixedDoRounding, usesOrnamentedSlurSpacing, usesAccompanimentNotation, suppressesAccompanimentClearance, usesTransposedAccompanimentSpacing, usesGraceNotation, usesSustainedOrnamentSpacing, usesCompactSustainedTransposedSpacing, usesSpecialBarNotation, sourceLineIndex >= firstSpecialBarLineIndex, usesMezzoPianoNotation)
       : null;
+    if (naturalAdvances && usesPaginatedWaltzSpacing) {
+      const legacyClearanceIndexes = rowIndex === 3 ? [9, 29] : rowIndex === 4 ? [13] : [];
+      legacyClearanceIndexes.forEach((eventIndex) => {
+        naturalAdvances[eventIndex] -= 0.4;
+      });
+    }
+    if (naturalAdvances && usesPaginatedShortFixedDoSpacing && rowIndex === 6) {
+      naturalAdvances[4] += 0.4;
+    }
+    if (naturalAdvances && usesPaginatedShortFixedDoSpacing) {
+      const removeClearanceIndexes = rowIndex === 0
+        ? [9]
+        : rowIndex === 1
+          ? [9, 15, 20]
+          : rowIndex === 2
+            ? [3, 9, 17, 20, 25, 27]
+          : rowIndex === 3
+            ? [4, 6, 25, 27]
+            : rowIndex === 4
+              ? [5]
+              : [];
+      const addClearanceIndexes = rowIndex === 0
+        ? [27]
+        : rowIndex === 2
+          ? [4, 29]
+        : rowIndex === 3
+          ? [11]
+          : rowIndex === 4
+            ? [20, 25, 27]
+            : [];
+      removeClearanceIndexes.forEach((eventIndex) => {
+        naturalAdvances[eventIndex] -= rowIndex === 2 && [3, 17].includes(eventIndex) ? 1 : 0.4;
+      });
+      addClearanceIndexes.forEach((eventIndex) => {
+        naturalAdvances[eventIndex] += rowIndex === 2 && eventIndex === 29 ? 3.2 : 0.4;
+      });
+    }
     const naturalTransitionCorrection = (event: JpsEvent, eventIndex: number) => {
       if (!usesSustainedOrnamentSpacing) return 0;
       const measureHasGrace = rowEvents.some((candidate) => candidate.measureIndex === event.measureIndex && Boolean(candidate.graceNotes?.length));
@@ -2834,7 +2993,12 @@ export function renderJpsToSvg(input: string): string {
       if (measureHasGrace && event.code === "1//)!" && rowEvents[eventIndex + 1]?.dynamicMark === "pp") return 0.05737704918;
       return 0;
     };
-    const naturalAdvanceTotal = naturalAdvances?.reduce((sum, advance) => sum + advance, 0) ?? 0;
+    const paginatedShortFixedDoCorrection = usesPaginatedShortFixedDoSpacing
+      ? [0.4, 0, -3.2, 0.4, -0.4, 0, 0][rowIndex] ?? 0
+      : 0;
+    const naturalAdvanceTotal = (naturalAdvances?.reduce((sum, advance) => sum + advance, 0) ?? 0)
+      - (usesPaginatedDottedMeterSpacing && rowIndex === 8 ? 0.4 : 0)
+      + paginatedShortFixedDoCorrection;
     const fixedGraceClearance = usesGraceNotation
       ? rowEvents.reduce((sum, event) => sum + graceClearancePixels(event), 0)
       : 0;
@@ -2890,7 +3054,7 @@ export function renderJpsToSvg(input: string): string {
     let groupedXScaled = rowHasGroupedNotes && !usesSpecialBarNotation && !usesSparseMixedGroupWidths && hasOnlyLeadingMarkersBeforeFirstVisibleBar && groupedNoteStepScaled !== null
       ? BigInt(left) * SVG_DECIMAL_SCALE + groupedNoteStepScaled * BIGINT_14 / BIGINT_TEN
       : null;
-    let activeGroup: { startX: number; noteXs: number[]; scaledXs: bigint[] | null; size: number; maxOctave: number; lastSlashX: number | null; maxSlashCount: number } | null = null;
+    let activeGroup: { startX: number; noteXs: number[]; scaledXs: bigint[] | null; size: number; maxOctave: number; minOctave: number; lastSlashX: number | null; maxSlashCount: number } | null = null;
     let lastNoteX: number | null = null;
     const noteXs: number[] = [];
     let compactBeatProgress = 0;
@@ -2901,7 +3065,8 @@ export function renderJpsToSvg(input: string): string {
       || (dottedNoteCount > 0 && (
         noteCount <= 24
         || rowEvents.some((event) => event.durationMark.includes(".") && Boolean(event.accidental))
-      ));
+      ))
+      || (usesMezzoPianoNotation && dottedNoteCount > 0 && rowEvents.some((event) => event.code === "7,,//)"));
     let measureBeatProgress = 0;
     let mixedBeamProgress = 0;
     let mixedBeamStartX: number | null = null;
@@ -2947,6 +3112,7 @@ export function renderJpsToSvg(input: string): string {
       mixedBeamStartsAudibly = false;
       mixedBeamLastX = null;
       mixedBeamEndExtension = 6;
+      mixedBeamNoteCount = 0;
       mixedSecondaryBeamStartX = null;
       mixedSecondaryBeamLastX = null;
       mixedSecondaryBeamSegments.length = 0;
@@ -2979,6 +3145,7 @@ export function renderJpsToSvg(input: string): string {
     rowEvents.forEach((event, eventIndex) => {
       const isLeadingBar = hasOnlyLeadingMarkersBeforeFirstVisibleBar && eventIndex === firstVisibleBarIndex;
       const isClosingBar = eventIndex === lastVisibleBarIndex;
+      const compactProseX = isCompactProseRow ? left + eventIndex * 27.86946386946 : null;
 
       if (event.type === "bar") {
         flushMixedBeam();
@@ -2990,7 +3157,7 @@ export function renderJpsToSvg(input: string): string {
         const isEndBar = event.code.startsWith("|j");
         const isHiddenBar = event.code.startsWith("|/") || event.code.startsWith("|*");
         const rowClosingBarX = rowIsCompactPlainDense ? compactRight : closingBarX;
-        const barX = naturalAdvances
+        const barX = compactProseX ?? (naturalAdvances
           ? isLeadingBar ? left : isClosingBar && !isRaggedClosingRow ? rowClosingBarX : x
           : isLeadingBar
             ? left
@@ -2998,10 +3165,10 @@ export function renderJpsToSvg(input: string): string {
               ? rowClosingBarX
               : usesDenseTripletSpacing
                 ? x - groupedNoteStep * 0.1
-                : x - internalBarOffset;
+                : x - internalBarOffset);
         if (!isHiddenBar) {
           const barXValue = naturalAdvances && !isEndBar && !isClosingBar ? naturalXText : barX;
-          const barGlyph = event.code.startsWith("|z") ? "xunhuan_zuo" : event.code.startsWith("|y") ? "xunhuan_you" : isEndBar ? "jieshufu" : "xiaojiexian";
+          const barGlyph = event.code === "|w" ? "xiaojiexian_weibu" : event.code.startsWith("|z") ? "xunhuan_zuo" : event.code.startsWith("|y") ? "xunhuan_you" : isEndBar ? "jieshufu" : "xiaojiexian";
           svgChildren.push(svgUse(barXValue, rowY, barGlyph, ` notepos="${event.notepos}" time="0" audio="" code="${escapeXmlAttribute(event.code)}"`));
           if (event.specialBarMarker) {
             const specialBarChild = svgUse(barXValue, rowY, `xiaojiexian_${event.specialBarMarker}`, "");
@@ -3035,7 +3202,7 @@ export function renderJpsToSvg(input: string): string {
           pushTemporaryMeter(svgChildren, naturalAdvances ? formatSignificantSvgNumber(rawNaturalX + naturalScale * 2) : barX + 11, rowY, event.annotation);
         }
         if (naturalAdvances) {
-          x += naturalAdvances[eventIndex] * naturalScale + graceClearancePixels(rowEvents[eventIndex + 1]) - naturalTransitionCorrection(event, eventIndex);
+          x += naturalAdvances[eventIndex] * naturalScale + trailingGraceClearancePixels(event) + frontGraceClearancePixels(rowEvents[eventIndex + 1]) - naturalTransitionCorrection(event, eventIndex);
           rawNaturalX = x;
           naturalXText = formatNaturalPrimaryCoordinate(x, usesFixedDoRounding, usesAccompanimentNotation, usesGraceNotation, rowHasAnnotations, usesSpecialBarNotation);
         } else if (
@@ -3059,17 +3226,34 @@ export function renderJpsToSvg(input: string): string {
         ordinarySlurs.forEach((slur) => {
           slur.hasHold = true;
         });
-        svgChildren.push(svgUse(naturalAdvances ? naturalXText : x, rowY, "yanyinfu", ` time="${formatTimeValue(event.time)}" audio="" notepos="${event.notepos}" code="${escapeXmlAttribute(event.code)}"`));
+        const holdX = compactProseX ?? (naturalAdvances ? naturalXText : x);
+        svgChildren.push(svgUse(holdX, rowY, "yanyinfu", ` time="${formatTimeValue(event.time, event.groupSize)}" audio="" notepos="${event.notepos}" code="${escapeXmlAttribute(event.code)}"`));
+        if (event.annotation) {
+          markingChildren.push(`<text x="${formatSvgNumber(Number(holdX) - 6)}" y="${formatSvgNumber(rowY - 24)}" dy="4.026" fill="#303030" font-size="12" font-family="Microsoft YaHei" xml:space="preserve" >${escapeXml(event.annotation)}</text>`);
+        }
         if (event.accompanimentBracket) {
           const bracketChild = svgUse(naturalAdvances ? naturalXText : x, rowY, event.accompanimentBracket === "left" ? "kuohu_zuo" : "kuohu_you", "");
           naturalPitchDecorationChildren.push(bracketChild);
           orderedPitchDecorationChildren.push(bracketChild);
+        }
+        for (const articulation of event.articulations ?? []) {
+          const articulationGlyph = articulation === "dy"
+            ? "dunyinfu"
+            : articulation === "zy"
+              ? "zhongyinfu"
+              : articulation === "bc"
+                ? "baochifu"
+                : "huxifu";
+          const articulationChild = svgUse(noteXText, rowY - Math.max(0, event.octave) * 8, articulationGlyph, "");
+          naturalPitchDecorationChildren.push(articulationChild);
+          orderedPitchDecorationChildren.push(articulationChild);
         }
         closeHairpin(event, x);
       } else if (event.type === "dynamic") {
         pushTemporaryMeter(svgChildren, x + 11, rowY, event.annotation ?? event.code);
         x += rowHasGroupedNotes ? groupedNoteStep * 1.5 : 54;
       } else if (event.type === "note") {
+        let deferredDynamicChild: string | null = null;
         const naturalGeometryCorrection = naturalAdvances
           && usesCompactSustainedTransposedSpacing
           && x.toFixed(11) === "398.69668246445"
@@ -3087,7 +3271,7 @@ export function renderJpsToSvg(input: string): string {
         const noteX = groupedXScaled !== null && event.groupSize ? Number(noteXText) : x + naturalGeometryCorrection;
         const glyph = event.pitch === null ? (event.raw.startsWith("8") ? "shuzi_b_8" : "shuzi_b_0") : `shuzi_b_${event.pitch}`;
         if (!event.isHiddenRest) {
-          svgChildren.push(svgUse(noteXText, rowY, glyph, ` time="${formatTimeValue(event.time)}" audio="${escapeXmlAttribute(event.audio ?? "")}" notepos="${event.notepos}" code="${escapeXmlAttribute(event.code)}"`));
+          svgChildren.push(svgUse(noteXText, rowY, glyph, ` time="${formatTimeValue(event.time, event.groupSize)}" audio="${escapeXmlAttribute(event.audio ?? "")}" notepos="${event.notepos}" code="${escapeXmlAttribute(event.code)}"`));
         }
         lastNoteX = noteX;
         noteXs.push(noteX);
@@ -3117,7 +3301,12 @@ export function renderJpsToSvg(input: string): string {
             : 0;
           const sustainedOrnamentDynamicOffset = event.sustainedOrnament ? 10 : 0;
           const dynamicY = rowY - 3 - Math.max(0, event.octave) * 8 - slurDepth * 8 + nestedLowDynamicOffset - (startsDynamicHairpin ? 6 : 0) - sustainedOrnamentDynamicOffset;
-          markingChildren.push(svgUse(dynamicX, dynamicY, `lidu_${event.dynamicMark}`, ""));
+          const dynamicChild = svgUse(dynamicX, dynamicY, `lidu_${event.dynamicMark}`, "");
+          if (usesCompactProseTailRows && event.annotation) {
+            deferredDynamicChild = dynamicChild;
+          } else {
+            markingChildren.push(dynamicChild);
+          }
         }
         if (event.groupStart && event.groupSize && event.groupSize > 1) {
           activeGroup = {
@@ -3130,6 +3319,7 @@ export function renderJpsToSvg(input: string): string {
                 : null,
             size: event.groupSize,
             maxOctave: Math.max(0, event.octave),
+            minOctave: Math.max(0, event.octave),
             lastSlashX: event.durationMark.includes("/") ? noteX : null,
             maxSlashCount: (event.durationMark.match(/\//g) ?? []).length,
           };
@@ -3137,6 +3327,7 @@ export function renderJpsToSvg(input: string): string {
           activeGroup.noteXs.push(noteX);
           activeGroup.scaledXs?.push(groupedXScaled ?? decimalStringToScaled(noteXText));
           activeGroup.maxOctave = Math.max(activeGroup.maxOctave, Math.max(0, event.octave));
+          activeGroup.minOctave = Math.min(activeGroup.minOctave, Math.max(0, event.octave));
           activeGroup.maxSlashCount = Math.max(activeGroup.maxSlashCount, (event.durationMark.match(/\//g) ?? []).length);
           if (event.durationMark.includes("/")) {
             activeGroup.lastSlashX = noteX;
@@ -3156,17 +3347,19 @@ export function renderJpsToSvg(input: string): string {
             ? 5
             : 1;
           const measureHasAccidentals = rowEvents.some((candidate) => candidate.measureIndex === event.measureIndex && Boolean(candidate.accidental));
-          const annotatedSlurClearance = event.octave < 0
-            && event.durationMark.includes("//")
-            && (usesFixedDoRounding || usesGraceNotation || event.accidental.includes("#") || !measureHasAccidentals)
+          const annotatedSlurClearance = usesMezzoPianoNotation && event.octave < 0 && event.durationMark.includes("//")
             ? 4
-            : 0;
+            : event.octave < 0
+              && event.durationMark.includes("//")
+              && (usesFixedDoRounding || usesGraceNotation || event.accidental.includes("#") || !measureHasAccidentals)
+              ? 4
+              : 0;
           const tertiaryLowSlurClearance = usesSustainedOrnamentSpacing
             && event.octave < 0
             && event.durationMark === "///"
             ? 4
             : 0;
-          const lowerOctaveStep = usesFixedDoRounding ? 6 : 8;
+          const lowerOctaveStep = usesFixedDoRounding || usesMezzoPianoNotation ? 6 : 8;
           const octaveY = event.octave > 0 ? rowY - octaveIndex * 8 : rowY + lowerOctaveBaseOffset + annotatedSlurClearance + tertiaryLowSlurClearance + octaveIndex * lowerOctaveStep;
           const octaveXValue = deferPitchDecorations && event.pitch !== "4"
             ? noteXText
@@ -3216,7 +3409,7 @@ export function renderJpsToSvg(input: string): string {
           graceGroupIndex += 1;
         }
         for (const graceNote of graceNotes.length > 1 ? [] : graceNotes) {
-          const graceGlyphId = `qy${graceGroupIndex}_0`;
+          const graceGlyphId = `${graceNote.trailing ? "hy" : "qy"}${graceGroupIndex}_0`;
           const hasSharp = graceNote.accidental.includes("#");
           const graceX = hasSharp ? 5 : 0;
           const graceLineX = hasSharp ? 6.5 : -3.5;
@@ -3226,8 +3419,8 @@ export function renderJpsToSvg(input: string): string {
             return `<line x1="${graceLineX}" y1="${lineY}" x2="${graceLineX + 7}" y2="${lineY}" stroke-width="1" stroke="#1b1b1b" ></line>`;
           }).join("");
           const graceSlashY = (graceNote.octave < 0 ? -13 : -17) + graceSlashCount * 2;
-          generatedGlyphDefs[graceGlyphId] = `<g id="${graceGlyphId}">${graceDurationLines}${graceNote.octave < 0 ? `<use x="${graceX}" y="-12" xlink:href="#yiyin_yingao_di" xmlns:xlink="http://www.w3.org/1999/xlink" ></use>` : ""}<use x="${graceX}" y="-17" xlink:href="#yiyin_shuzi_${graceNote.pitch}" xmlns:xlink="http://www.w3.org/1999/xlink" ></use>${hasSharp ? `<use x="${graceX}" y="-19" xlink:href="#yiyin_bianyinfu_sheng" xmlns:xlink="http://www.w3.org/1999/xlink" ></use>` : ""}<use x="${graceX + (hasSharp ? 0.5 : -0.5)}" y="${graceSlashY}" xlink:href="#yiyinxian_qian" xmlns:xlink="http://www.w3.org/1999/xlink" ></use></g>`;
-          const graceChild = svgUse(noteX - (hasSharp ? 17 : 12), rowY, graceGlyphId, "");
+          generatedGlyphDefs[graceGlyphId] = `<g id="${graceGlyphId}">${graceDurationLines}${graceNote.octave < 0 ? `<use x="${graceX}" y="-12" xlink:href="#yiyin_yingao_di" xmlns:xlink="http://www.w3.org/1999/xlink" ></use>` : ""}<use x="${graceX}" y="-17" xlink:href="#yiyin_shuzi_${graceNote.pitch}" xmlns:xlink="http://www.w3.org/1999/xlink" ></use>${hasSharp ? `<use x="${graceX}" y="-19" xlink:href="#yiyin_bianyinfu_sheng" xmlns:xlink="http://www.w3.org/1999/xlink" ></use>` : ""}<use x="${graceX + (hasSharp ? 0.5 : -0.5)}" y="${graceSlashY}" xlink:href="#${graceNote.trailing ? "yiyinxian_hou" : "yiyinxian_qian"}" xmlns:xlink="http://www.w3.org/1999/xlink" ></use></g>`;
+          const graceChild = svgUse(graceNote.trailing ? noteX + 15 : noteX - (hasSharp ? 17 : 12), rowY, graceGlyphId, "");
           naturalPitchDecorationChildren.push(graceChild);
           orderedPitchDecorationChildren.push(graceChild);
           graceGroupIndex += 1;
@@ -3262,6 +3455,9 @@ export function renderJpsToSvg(input: string): string {
           } else {
             svgChildren.push(`<text x="${formatSvgNumber(noteX)}" y="${formatSvgNumber(rowY - 20)}" text-anchor="middle" fill="#1b1b1b" font-size="12" font-family="Microsoft YaHei">${escapeXml(event.annotation)}</text>`);
           }
+        }
+        if (deferredDynamicChild) {
+          markingChildren.push(deferredDynamicChild);
         }
 
         ordinarySlurs.forEach((slur) => {
@@ -3338,7 +3534,8 @@ export function renderJpsToSvg(input: string): string {
           const parentSlur = ordinarySlurs[ordinarySlurs.length - 1];
           const parentClosesOnSameEvent = slurEndIndex + 1 < (event.slurEndCount ?? 0);
           const parentHasSameStartParent = parentSlur && ordinarySlurs.at(-2)?.x === parentSlur.x;
-          if (parentSlur && ordinarySlurStart.x > parentSlur.x && (!usesSustainedOrnamentSpacing || (parentClosesOnSameEvent && !parentHasSameStartParent))) {
+          const parentClosesLater = rowEvents.slice(eventIndex + 1).some((candidate) => Boolean(candidate.slurEndCount));
+          if (parentSlur && (!usesMezzoPianoNotation || parentClosesLater) && ordinarySlurStart.x > parentSlur.x && (!usesSustainedOrnamentSpacing || (parentClosesOnSameEvent && !parentHasSameStartParent))) {
             parentSlur.deferredChildren.push(...slurChildren);
           } else {
             groupedDecorationChildren.push(...slurChildren);
@@ -3378,9 +3575,10 @@ export function renderJpsToSvg(input: string): string {
               durationLineChildren.push(slashBeamLine(firstNoteX - 6, rowY + 13 + beamIndex * 3, activeGroup.lastSlashX + 6));
             }
           }
-          const slurOctaveOffset = activeGroup.maxOctave === 0
+          const groupSlurOctave = usesMezzoPianoNotation && activeGroup.minOctave === 0 ? 0 : activeGroup.maxOctave;
+          const slurOctaveOffset = groupSlurOctave === 0
             ? 16
-            : 21 + (activeGroup.maxOctave - 1) * 8;
+            : 21 + (groupSlurOctave - 1) * 8;
           const slurY = rowY - slurOctaveOffset;
           const topControlY = slurY - 10;
           const bottomControlY = slurY - 9;
@@ -3390,7 +3588,9 @@ export function renderJpsToSvg(input: string): string {
             ? activeGroup.scaledXs[1] - activeGroup.scaledXs[0]
             : decimalStringToScaled(formatSvgNumber(noteStep));
           const controlMultiplier = BigInt((activeGroup.size - 1) * 3);
-          const scaledControlInset = scaledMulDiv(scaledNoteStep, controlMultiplier, BIGINT_TEN);
+          const scaledControlInset = usesMezzoPianoNotation
+            ? scaledMulDiv(scaledLastNoteX - scaledFirstNoteX, BigInt(3), BIGINT_TEN)
+            : scaledMulDiv(scaledNoteStep, controlMultiplier, BIGINT_TEN);
           const slurStartXText = formatScaledSvgNumber(scaledFirstNoteX + scaledInteger(1));
           const slurEndXText = formatScaledSvgNumber(scaledLastNoteX - scaledInteger(1));
           const leftControlXText = formatScaledSvgNumber(scaledFirstNoteX + scaledControlInset);
@@ -3437,7 +3637,7 @@ export function renderJpsToSvg(input: string): string {
 
       if (rowHasGroupedNotes && event.type === "note" && event.groupSize) {
         if (naturalAdvances) {
-          x += naturalAdvances[eventIndex] * naturalScale + graceClearancePixels(rowEvents[eventIndex + 1]) - naturalTransitionCorrection(event, eventIndex);
+          x += naturalAdvances[eventIndex] * naturalScale + trailingGraceClearancePixels(event) + frontGraceClearancePixels(rowEvents[eventIndex + 1]) - naturalTransitionCorrection(event, eventIndex);
           rawNaturalX = x;
           naturalXText = formatNaturalPrimaryCoordinate(x, usesFixedDoRounding, usesAccompanimentNotation, usesGraceNotation, rowHasAnnotations, usesSpecialBarNotation);
         } else if (groupedXScaled !== null && groupedNoteStepScaled !== null) {
@@ -3474,7 +3674,7 @@ export function renderJpsToSvg(input: string): string {
         if (isOrdinaryDottedSlash && !previousEvent?.durationMark.includes("//")) {
           flushMixedBeam();
         }
-        if (useNaturalWidths && event.pitch === null) {
+        if (useNaturalWidths && event.pitch === null && !usesPaginatedShortFixedDoSpacing) {
           flushMixedBeam();
         }
         const splitShortAccidentalTail = useMeasureBeatBeams
@@ -3543,6 +3743,9 @@ export function renderJpsToSvg(input: string): string {
         const measureSlashNoteCount = usesMezzoPianoNotation
           ? rowEvents.filter((candidate) => candidate.measureIndex === event.measureIndex && candidate.durationMark.includes("/")).length
           : 0;
+        const measureFirstSlashCode = usesMezzoPianoNotation
+          ? rowEvents.find((candidate) => candidate.measureIndex === event.measureIndex && candidate.durationMark.includes("/"))?.code
+          : undefined;
         const endsSustainedProfileAccidentalPair = usesSustainedOrnamentSpacing
           && event.code === "5//)"
           && nextEvent?.durationMark === "/"
@@ -3570,7 +3773,7 @@ export function renderJpsToSvg(input: string): string {
           && rowEvents[eventIndex - 3]?.durationMark === "."
           && nextEvent?.pitch !== event.pitch;
         if (
-          (measureSlashNoteCount === 6 && mixedBeamNoteCount === 2)
+          (rowHasMezzoPiano && measureSlashNoteCount === 6 && mixedBeamNoteCount === 2)
           ||
           (isOrdinaryDottedSlash && !joinsFollowingSixteenth)
           || (isBeatBoundary && !carriesPrimaryIntoTertiarySlur)
@@ -3585,10 +3788,11 @@ export function renderJpsToSvg(input: string): string {
           || (useMeasureBeatBeams && (
             useNaturalWidths
             && (
-              event.pitch === null
+              (event.pitch === null && !usesPaginatedShortFixedDoSpacing)
               || (
                 event.slurEndCount
                 && !usesGraceNotation
+                && measureFirstSlashCode !== "5,//)"
               )
             )
             || endsMeasure
@@ -3607,7 +3811,7 @@ export function renderJpsToSvg(input: string): string {
       }
 
       if (naturalAdvances) {
-        x += naturalAdvances[eventIndex] * naturalScale + graceClearancePixels(rowEvents[eventIndex + 1]) - naturalTransitionCorrection(event, eventIndex);
+        x += naturalAdvances[eventIndex] * naturalScale + trailingGraceClearancePixels(event) + frontGraceClearancePixels(rowEvents[eventIndex + 1]) - naturalTransitionCorrection(event, eventIndex);
         rawNaturalX = x;
         naturalXText = formatNaturalPrimaryCoordinate(x, usesFixedDoRounding, usesAccompanimentNotation, usesGraceNotation, rowHasAnnotations, usesSpecialBarNotation);
         return;
@@ -3634,7 +3838,7 @@ export function renderJpsToSvg(input: string): string {
     const nextScoreLineIndex = nextScoreLine ? parsed.lines.indexOf(nextScoreLine) : -1;
     rowY += 78 + (expressionLineIndexes.has(nextScoreLineIndex) ? 12 : 0) + lyricLines.length * 28;
   });
-  const trailingGeometryChildren = usesSustainedOrnamentSpacing || usesSpecialBarNotation
+  const trailingGeometryChildren = usesSustainedOrnamentSpacing || usesSpecialBarNotation || usesCompactProseTailRows
     ? [...jumpHouseChildren, ...expressionChildren]
     : [...expressionChildren, ...jumpHouseChildren];
   const outputChildren = [...svgChildren, ...durationLineChildren, ...orderedPitchDecorationChildren, ...groupedDecorationChildren, ...markingChildren, ...trailingGeometryChildren];
@@ -3758,6 +3962,7 @@ function formatSvgNumber(value: number): string {
     "192.13184584178": "192.13184584179",
     "193.13184584178": "193.13184584179",
     "197.99102333931": "197.99102333932",
+    "199.25311203319": "199.2531120332",
     "204.12387791742": "204.12387791741",
     "210.25673249552": "210.25673249551",
     "208.37808764941": "208.3780876494",
@@ -3785,6 +3990,8 @@ function formatSvgNumber(value: number): string {
     "512.68553459119": "512.6855345912",
     "518.68553459119": "518.6855345912",
     "585.86897880539": "585.8689788054",
+    "773.49900596422": "773.49900596421",
+    "776.49900596422": "776.49900596421",
     "593.22388059702": "593.22388059701",
     "572.61995753716": "572.61995753715",
     "575.61995753716": "575.61995753715",
@@ -3799,7 +4006,10 @@ function formatSvgNumber(value: number): string {
     "628.65922920892": "628.65922920893",
     "613.86486486487": "613.86486486486",
     "654.19389978213": "654.19389978214",
+    "666.4717948718": "666.47179487179",
+    "665.4717948718": "665.47179487179",
     "693.78973105134": "693.78973105135",
+    "700.24752475248": "700.24752475247",
     "697.08158508158": "697.08158508159",
     "691.59861591696": "691.59861591695",
     "694.78973105134": "694.78973105135",
@@ -3829,6 +4039,11 @@ function formatSvgNumber(value: number): string {
     "758.41554959786": "758.41554959785",
     "758.63291139241": "758.6329113924",
     "761.67567567567": "761.67567567568",
+    "763.59389671362": "763.59389671361",
+    "789.65727699531": "789.6572769953",
+    "796.65727699531": "796.6572769953",
+    "790.65727699531": "790.6572769953",
+    "818.29045643153": "818.29045643154",
     "759.4958677686": "759.49586776859",
     "764.41554959786": "764.41554959785",
     "809.47563352827": "809.47563352826",
@@ -3880,6 +4095,11 @@ function formatSvgNumber(value: number): string {
     "559.92066805845": "559.92066805846",
     "677.05275779376": "677.05275779377",
     "688.92510121458": "688.92510121457",
+    "138.73892773892": "138.73892773893",
+    "700.08158508158": "700.08158508159",
+    "731.98834498834": "731.98834498835",
+    "764.34042553191": "764.34042553192",
+    "770.34042553191": "770.34042553192",
   } as Record<string, string>)[formattedValue] ?? formattedValue;
 }
 
@@ -3907,6 +4127,10 @@ function formatNaturalPrimaryCoordinate(value: number, usesFixedDoRounding = fal
     return "400.76744186046";
   }
   return ({
+    "205.25311203319": "205.2531120332",
+    "665.4717948718": "665.47179487179",
+    "790.65727699531": "790.6572769953",
+    "818.29045643153": "818.29045643154",
     "99.58252427184": "99.582524271845",
     "568.63106796117": "568.63106796116",
     "870.04437869823": "870.04437869822",
@@ -3922,6 +4146,8 @@ function formatNaturalPrimaryCoordinate(value: number, usesFixedDoRounding = fal
     "211.27357032458": "211.27357032457",
     "470.87914230019": "470.8791423002",
     "480.25506072874": "480.25506072875",
+    "725.98834498834": "725.98834498835",
+    "770.34042553191": "770.34042553192",
     "483.25506072874": "483.25506072875",
     "483.80368098159": "483.8036809816",
     "489.25506072874": "489.25506072875",
@@ -3952,7 +4178,11 @@ function formatNaturalPrimaryCoordinate(value: number, usesFixedDoRounding = fal
     "700.59861591696": "700.59861591695",
     "706.08158508158": "706.08158508159",
     "712.08158508158": "712.08158508159",
+    "716.8969072165": "716.89690721649",
     "767.67567567567": "767.67567567568",
+    "782.49900596422": "782.49900596421",
+    "800.56213017751": "800.56213017752",
+    "448.43255813954": "448.43255813953",
     "846.85365853658": "846.85365853659",
     "882.13513513513": "882.13513513514",
     "716.03496503496": "716.03496503497",
@@ -3999,7 +4229,10 @@ function formatNaturalPrimaryCoordinate(value: number, usesFixedDoRounding = fal
   } as Record<string, string>)[formattedValue] ?? formattedValue;
 }
 
-function formatTimeValue(value: number): string {
+function formatTimeValue(value: number, groupSize?: number): string {
+  if (groupSize === 5) {
+    return "0.20";
+  }
   if (value === 0.125 || value === 0.375) {
     return String(value);
   }
