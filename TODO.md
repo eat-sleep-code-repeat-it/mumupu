@@ -13,7 +13,7 @@
 - [x] `example-002-sandumojin.jps` matches its cached oracle byte-for-byte.
 - [x] `sandu-mojin.jps` matches its canonical cached oracle byte-for-byte.
 - [x] `memory-from-cats.jps` matches its cached oracle byte-for-byte.
-- [ ] Every JPS file under `public/songs` matches its corresponding cached SVG.
+- [x] Every JPS file under `public/songs` matches its corresponding cached SVG.
 - [x] Focused and broad validation scripts read local oracle caches without rendering those caches in the app.
 
 ## Phase 1: Home Automatic Rendering
@@ -31,7 +31,7 @@
 - [x] Add a cache-only song parity command that checks every `public/songs/*.jps` fixture.
 - [x] Resolve canonical and legacy cache names without using stale aliases when an identical canonical fixture exists.
 - [x] Report exact matches, mismatches, missing caches, local/cache lengths, and first differing byte.
-- [ ] Cluster song mismatches by notation feature instead of fixing files one at a time.
+- [x] Cluster song mismatches by notation feature instead of fixing files one at a time.
 - [x] Keep exact fixtures as regression checks after every renderer change.
 - [ ] If a cache is missing, obtain a remote SVG only for validation and never return it from application code.
 
@@ -112,8 +112,6 @@ Current verified baseline: 38 songs checked, 38 exact, 0 mismatched, and 0 missi
 
 ## Active Order
 
-1. Implement debounced automatic home rendering using local `/api/translate`.
-2. Add a song-wide cached parity report.
-3. Re-run and cluster song failures by syntax feature.
-4. Implement the highest-frequency parser/rendering gap with one focused fixture check.
-5. Continue cluster by cluster until all cached song fixtures match.
+1. Preserve 38/38 cached song parity while extending renderer coverage.
+2. Implement remaining documented notation features with focused fixtures.
+3. Resolve or document specification ambiguities that are not represented by current caches.
