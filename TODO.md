@@ -49,7 +49,7 @@
 - [ ] Rhythm note `9`.
 - [ ] Custom beat joins `~` and forced splits `^`.
 - [x] Parse and visibly render song dynamics `&p`, `&pp`, `&mp`, `&mf`, `&f`, and `&rit` with oracle-compatible note metadata and placement.
-- [ ] Replace dynamics text with exact locally owned path glyphs and oracle-compatible definition ordering.
+- [x] Replace dynamics text with exact locally owned path glyphs and oracle-compatible definition ordering.
 - [x] Crescendo/diminuendo spans `<`, `>`, and `!`.
 - [ ] Hairpin `+` vertical adjustments.
 - [ ] Front grace notes `[...]` and rear grace notes `[h...]` with pitch, octave, accidental, and duration marks.
@@ -108,7 +108,7 @@
 - [ ] Reach byte-for-byte equality for every song with a corresponding cached SVG.
 - [ ] Document any spec ambiguity that cannot be inferred from the text or cached fixtures.
 
-Current verified baseline: 38 songs checked, 22 exact, 16 mismatched, and 0 missing caches. The exact song fixtures are `sandu-mojin.jps` through its canonical content-identical cache, `baihualin.jps`, `Londonderry.jps`, `LondonderryAir.jps`, `Londonderry-hanshan.jps`, `always-zhoushen.jps`, `047-keketuodemuyangren.jps`, `ganlanshu.jps`, `ganlanshu-qiyu.jps`, `xiyangyang.jps`, `ren-jian-gong-ming.jps`, `yinjie-mojin-daokou.jps`, `sometime-when-it-rains.jps`, `sometime-when-it-rains-FixedDo.jps`, `sometime-when-it-rains-FixedDoH.jps`, `sometime-when-it-rains-FixedDoHK.jps`, `hejiayi-F-Swan-lake.jps`, `hejiayi-F-Swan-lake-alternativekeys.jps`, `hejiayi-swan-shengsan.jps`, `hejiayi-G-string-original.jps`, `hejiayi-G-string-alternativeKeys.jps`, and `hejiayi-G-string-alternativeKeys2.jps`.
+Current verified baseline: 38 songs checked, 31 exact, 7 mismatched, and 0 missing caches. The exact song fixtures are `sandu-mojin.jps` through its canonical content-identical cache, `baihualin.jps`, `Londonderry.jps`, `LondonderryAir.jps`, `Londonderry-hanshan.jps`, `always-zhoushen.jps`, `047-keketuodemuyangren.jps`, `ganlanshu.jps`, `ganlanshu-qiyu.jps`, `guang-hui-sui-yue.jps`, `xiyangyang.jps`, `yidongdexin.jps`, `ren-jian-gong-ming.jps`, `ren-jian-gong-ming-bB.jps`, `yinjie-mojin-daokou.jps`, `sometime-when-it-rains.jps`, `sometime-when-it-rains-FixedDo.jps`, `sometime-when-it-rains-FixedDoH.jps`, `sometime-when-it-rains-FixedDoHK.jps`, `hejiayi-F-Swan-lake.jps`, `hejiayi-F-Swan-lake-alternativekeys.jps`, `hejiayi-swan-shengsan.jps`, `hejiayi-G-string-original.jps`, `hejiayi-G-string-alternativeKeys.jps`, `hejiayi-G-string-alternativeKeys2.jps`, `hejiayi-dream.jps`, `hejiayi-dream-AlternativeKey.jps`, `Haydn-Serenade-AlternativeKey.jps`, `Haydn-Serenade-Original.jps`, `huangwensheng-G-string.jps`, and `hongyan.jps`.
 
 ## Active Order
 
