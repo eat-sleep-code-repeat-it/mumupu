@@ -33,7 +33,6 @@
 - [x] Report exact matches, mismatches, missing caches, local/cache lengths, and first differing byte.
 - [x] Cluster song mismatches by notation feature instead of fixing files one at a time.
 - [x] Keep exact fixtures as regression checks after every renderer change.
-- [ ] If a cache is missing, obtain a remote SVG only for validation and never return it from application code.
 
 ## Phase 3: Description Header Rules (`spec/02-描述头.md`)
 
