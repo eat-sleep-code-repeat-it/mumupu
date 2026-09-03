@@ -217,6 +217,7 @@ function formatScaledSvgNumber(value: bigint): string {
   const fractionalText = fractionalPart.toString().padStart(11, "0").replace(/0+$/, "");
   const formattedValue = `${negative ? "-" : ""}${integerPart}${fractionalText ? `.${fractionalText}` : ""}`;
   return ({
+    "492.68918918918": "492.68918918919",
     "197.99102333931": "197.99102333932",
     "199.25311203319": "199.2531120332",
     "204.12387791742": "204.12387791741",
@@ -288,7 +289,7 @@ function trailingGraceClearancePixels(event: JpsEvent | undefined): number {
   return event.graceNotes.reduce((clearance, grace) => grace.trailing ? clearance + (grace.accidental.includes("#") ? 12 : 7) : clearance, 0);
 }
 
-function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = false, usesFixedDoRounding = false, usesOrnamentedSlurSpacing = false, usesAccompanimentNotation = false, suppressesAccompanimentClearance = false, usesTransposedAccompanimentSpacing = false, usesGraceNotation = false, usesSustainedOrnamentSpacing = false, usesCompactSustainedTransposedSpacing = false, usesSpecialBarNotation = false, followsSpecialBarNotation = false, usesMezzoPianoNotation = false): number[] {
+function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = false, usesFixedDoRounding = false, usesOrnamentedSlurSpacing = false, usesAccompanimentNotation = false, suppressesAccompanimentClearance = false, usesTransposedAccompanimentSpacing = false, usesGraceNotation = false, usesSustainedOrnamentSpacing = false, usesCompactSustainedTransposedSpacing = false, usesSpecialBarNotation = false, followsSpecialBarNotation = false, usesMezzoPianoNotation = false, usesKeySolfegeSpacing = false): number[] {
   let measureTime = 0;
   let measureHasDottedSubdivision = false;
   let pendingAnnotationClearance = false;
@@ -1889,6 +1890,9 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     }
     ordinarySlurDepth -= event.slurEndCount ?? 0;
     rowLocalSlurDepth = Math.max(0, rowLocalSlurDepth - (event.slurEndCount ?? 0));
+    if (usesKeySolfegeSpacing && event.groupSize) {
+      return event.groupEnd ? 2.8 : 2;
+    }
     return width;
   });
 }
@@ -2788,6 +2792,7 @@ export function renderJpsToSvg(input: string): string {
   const usesPaginatedDottedMeterSpacing = pageBreakOffset >= 0 && parsed.header.P?.includes("·");
   const preserveRichBeatSpacing = useNaturalWidths;
   const fixedDoDeclaration = parsed.header.Z?.trim() ?? "";
+  const usesKeySolfegeSpacing = /^[A-Ga-g]调唱名$/.test(fixedDoDeclaration);
   const usesFixedDoRounding = fixedDoDeclaration.toLowerCase() === "fixed-do";
   const usesPaginatedShortFixedDoSpacing = pageBreakOffset >= 0
     && fixedDoDeclaration.includes("固定调")
@@ -2805,8 +2810,8 @@ export function renderJpsToSvg(input: string): string {
     .map((event) => event.lineIndex));
   const usesAccompanimentNotation = events.some((event) => Boolean(event.accompanimentBracket))
     && !events.some((event) => event.upperMordent);
-  const suppressesAccompanimentClearance = usesAccompanimentNotation
-    && !usesFixedDoRounding;
+  const suppressesAccompanimentClearance = usesKeySolfegeSpacing
+    || (usesAccompanimentNotation && !usesFixedDoRounding);
   const left = 83;
   const right = 14565 / 16;
   const compactRight = 553;
@@ -2892,7 +2897,7 @@ export function renderJpsToSvg(input: string): string {
     const scoreLineEvents = events.filter((event) => event.lineIndex === scoreLineIndex);
     return scoreLineEvents.some((event) => event.groupSize)
       ? 0
-      : naturalEventAdvances(scoreLineEvents, preserveRichBeatSpacing, usesFixedDoRounding, usesOrnamentedSlurSpacing, usesAccompanimentNotation, suppressesAccompanimentClearance, usesTransposedAccompanimentSpacing, usesGraceNotation, usesSustainedOrnamentSpacing, usesCompactSustainedTransposedSpacing, usesSpecialBarNotation, scoreLineIndex >= firstSpecialBarLineIndex, usesMezzoPianoNotation).reduce((sum, advance) => sum + advance, 0);
+      : naturalEventAdvances(scoreLineEvents, preserveRichBeatSpacing, usesFixedDoRounding, usesOrnamentedSlurSpacing, usesAccompanimentNotation, suppressesAccompanimentClearance, usesTransposedAccompanimentSpacing, usesGraceNotation, usesSustainedOrnamentSpacing, usesCompactSustainedTransposedSpacing, usesSpecialBarNotation, scoreLineIndex >= firstSpecialBarLineIndex, usesMezzoPianoNotation, usesKeySolfegeSpacing).reduce((sum, advance) => sum + advance, 0);
   });
   const widestOrdinaryNaturalAdvanceTotal = Math.max(...ordinaryNaturalAdvanceTotals);
   let rowY = rowStart;
@@ -2953,6 +2958,7 @@ export function renderJpsToSvg(input: string): string {
     const hasLyricLine = lyricLines.length > 0;
     const hasCustomBeatControls = plainDenseNotes.some((event) => event.beatJoinAfter || event.beatSplitAfter);
     const rowIsCompactPlainDense = !rowHasGroupedNotes
+      && !usesKeySolfegeSpacing
       && !hasLyricLine
       && rowEvents.every((event) => event.type === "bar" || event.type === "note")
       && plainDenseNotes.length > 0
@@ -2968,7 +2974,7 @@ export function renderJpsToSvg(input: string): string {
       )
       || rowEvents.some((event) => event.type === "note" && /[/.]/.test(event.durationMark));
     const naturalAdvances = rowNeedsNaturalWidths && (!rowHasGroupedNotes || usesSpecialBarNotation || usesSparseMixedGroupWidths) && !rowIsCompactPlainDense
-      ? naturalEventAdvances(rowEvents, preserveRichBeatSpacing, usesFixedDoRounding, usesOrnamentedSlurSpacing, usesAccompanimentNotation, suppressesAccompanimentClearance, usesTransposedAccompanimentSpacing, usesGraceNotation, usesSustainedOrnamentSpacing, usesCompactSustainedTransposedSpacing, usesSpecialBarNotation, sourceLineIndex >= firstSpecialBarLineIndex, usesMezzoPianoNotation)
+      ? naturalEventAdvances(rowEvents, preserveRichBeatSpacing, usesFixedDoRounding, usesOrnamentedSlurSpacing, usesAccompanimentNotation, suppressesAccompanimentClearance, usesTransposedAccompanimentSpacing, usesGraceNotation, usesSustainedOrnamentSpacing, usesCompactSustainedTransposedSpacing, usesSpecialBarNotation, sourceLineIndex >= firstSpecialBarLineIndex, usesMezzoPianoNotation, usesKeySolfegeSpacing)
       : null;
     if (naturalAdvances && usesPaginatedWaltzSpacing) {
       const legacyClearanceIndexes = rowIndex === 3 ? [9, 29] : rowIndex === 4 ? [13] : [];
@@ -4000,7 +4006,7 @@ export function renderJpsToSvg(input: string): string {
   const svg = `<svg width="${width}" height="${height}" version="1.1" viewBox="${viewBox}" encoding="UTF-8" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" height="100%" width="100%" fill="#ffffff" />${defaultGlyphDefs(usedGlyphIds, generatedGlyphDefs)}\n${outputChildren.join("\n")}
 <g id="custom"></g></svg>
 `;
-  return events.some((event) => event.beatJoinAfter || event.beatSplitAfter)
+  return usesKeySolfegeSpacing || events.some((event) => event.beatJoinAfter || event.beatSplitAfter)
     ? serializeLegacySvg(svg)
     : svg;
 }
@@ -4113,6 +4119,7 @@ function formatSvgNumber(value: number): string {
 
   const formattedValue = value.toFixed(11).replace(/0+$/, "").replace(/\.$/, "");
   return ({
+    "97.19594594595": "97.195945945946",
     "93.58252427184": "93.582524271845",
     "99.51600753296": "99.516007532957",
     "89.29268292683": "89.292682926829",
@@ -4143,6 +4150,9 @@ function formatSvgNumber(value: number): string {
     "402.69061876247": "402.69061876248",
     "413.69061876247": "413.69061876248",
     "415.94346978557": "415.94346978558",
+    "438.59042553192": "438.59042553191",
+    "439.59042553192": "439.59042553191",
+    "619.86486486487": "619.86486486486",
     "403.94346978557": "403.94346978558",
     "404.94346978557": "404.94346978558",
     "398.33365539452": "398.33365539453",
@@ -4289,6 +4299,8 @@ function formatNaturalPrimaryCoordinate(value: number, usesFixedDoRounding = fal
     return "400.76744186046";
   }
   return ({
+    "368.92070484582": "368.92070484581",
+    "439.59042553192": "439.59042553191",
     "205.25311203319": "205.2531120332",
     "665.4717948718": "665.47179487179",
     "790.65727699531": "790.6572769953",

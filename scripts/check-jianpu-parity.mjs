@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(__dirname, "..");
-const fixtureDirectories = ["jps-files", "songs"];
+const fixtureDirectories = ["jps-files", "songs", "songs-ai-jin-100"];
 
 const { translate } = await import("../lib/translate.ts");
 
