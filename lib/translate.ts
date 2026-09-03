@@ -1,6 +1,8 @@
 import { DEFAULT_RICH_GLYPH_DEFS } from "./defaultRichGlyphDefs.js";
 
 const EXTRA_GLYPH_DEFS: Record<string, string> = {
+  shuzi_b_9:
+    '<g id="shuzi_b_9" transform="translate(-50,-50)"><path d="m45.5,43.5l9,13m0,-13l-9,13" fill="none" stroke="#1b1b1b" stroke-width="2.4" stroke-linecap="round"/></g>',
   dunyinfu:
     '<g id="dunyinfu" transform="translate(-50,-50)"><path d="m44.8,29.2l7.8,-0.03881l-3.8806,7.83881c-1.30647,-2.6 -2.61293,-5.2 -3.9194,-7.8z" fill="#1b1b1b"/></g>',
   zhongyinfu:
@@ -2481,7 +2483,7 @@ export function parseJpsEvents(input: string): JpsEvent[] {
             ? `${parsedToken.rawValue}${"(".repeat(slurStartCount)}${parsedToken.notationCode.slice(parsedToken.rawValue.length)}${sustainedOrnamentCode}${decorationCode}${accompanimentCode}${ornamentCode}${articulationCode}`
             : normalizedCode,
         pitch: isDynamic || parsedToken.isRest ? null : parsedToken.rawValue,
-        audio: parsedToken.isRest ? "0" : parsedToken.audioValue,
+        audio: parsedToken.isRest ? "0" : parsedToken.rawValue === "9" ? "" : parsedToken.audioValue,
         time: isDynamic
           ? 0
           : activeTuplet

@@ -46,7 +46,7 @@
 ## Phase 4: Core Melody Rules (`spec/03-曲部分.md`)
 
 - [x] Notes `1-7`, rests `0`, hidden rests `8`, holds `-`, octave marks, accidentals, dots, and slash durations.
-- [ ] Rhythm note `9`.
+- [x] Rhythm note `9` rendered as `X` with rhythmic duration and no pitch audio.
 - [ ] Custom beat joins `~` and forced splits `^`.
 - [x] Parse and visibly render song dynamics `&p`, `&pp`, `&mp`, `&mf`, `&f`, and `&rit` with oracle-compatible note metadata and placement.
 - [x] Replace dynamics text with exact locally owned path glyphs and oracle-compatible definition ordering.
