@@ -133,6 +133,8 @@ export interface JpsEvent {
   groupSize?: number;
   groupStart?: boolean;
   groupEnd?: boolean;
+  beatJoinAfter?: boolean;
+  beatSplitAfter?: boolean;
   slurStartCount?: number;
   slurEndCount?: number;
   hairpinStart?: "crescendo" | "diminuendo";
@@ -2484,6 +2486,8 @@ export function parseJpsEvents(input: string): JpsEvent[] {
             : normalizedCode,
         pitch: isDynamic || parsedToken.isRest ? null : parsedToken.rawValue,
         audio: parsedToken.isRest ? "0" : parsedToken.rawValue === "9" ? "" : parsedToken.audioValue,
+        beatJoinAfter: rawToken.includes("~"),
+        beatSplitAfter: rawToken.includes("^"),
         time: isDynamic
           ? 0
           : activeTuplet
@@ -2828,7 +2832,7 @@ export function renderJpsToSvg(input: string): string {
     svgChildren.push(`<text x="500" y="166" dy="16.71" text-anchor="middle" fill="#1b1b1b" font-size="20" font-family="Microsoft YaHei" >${escapeXml(subtitle.trim())}</text>`);
   }
 
-  if (parsed.header.D) {
+  if (parsed.header.D !== undefined) {
     const key = keySignatureParts(parsed.header.D);
     svgChildren.push(svgUse(80, 176, "diaohao_fu", ""));
     if (key.accidental === "$") {
@@ -2947,11 +2951,12 @@ export function renderJpsToSvg(input: string): string {
     const plainDenseNotes = rowEvents.filter((event) => event.type === "note" && !event.groupSize);
     const usesSparseMixedGroupWidths = rowHasGroupedNotes && groupCount <= 2 && plainDenseNotes.length > 0;
     const hasLyricLine = lyricLines.length > 0;
+    const hasCustomBeatControls = plainDenseNotes.some((event) => event.beatJoinAfter || event.beatSplitAfter);
     const rowIsCompactPlainDense = !rowHasGroupedNotes
       && !hasLyricLine
       && rowEvents.every((event) => event.type === "bar" || event.type === "note")
       && plainDenseNotes.length > 0
-      && plainDenseNotes.every((event) => event.time === 0.5);
+      && (plainDenseNotes.every((event) => event.time === 0.5) || hasCustomBeatControls);
     const deferPitchDecorations = useNaturalWidths || usesSpecialBarNotation || usesSparseMixedGroupWidths || (!rowHasGroupedNotes && !rowIsCompactPlainDense);
     const rowNeedsNaturalWidths = useNaturalWidths
       || lyricLines.length > 1
@@ -3093,7 +3098,11 @@ export function renderJpsToSvg(input: string): string {
       : null;
     const groupedNoteStep = groupedNoteStepText ? Number(groupedNoteStepText) : 0;
     const groupedNoteStepScaled = groupedNoteStepText ? decimalStringToScaled(groupedNoteStepText) : null;
-    const compactBeatCount = rowIsCompactPlainDense ? plainDenseNotes.length / 2 : 0;
+    const compactBeatCount = rowIsCompactPlainDense
+      ? hasCustomBeatControls
+        ? 7
+        : plainDenseNotes.length / 2
+      : 0;
     const compactNoteStep = rowIsCompactPlainDense
       ? (compactRight - left) / (compactBeatCount + Math.max(0, compactBeatCount - 1) * 1.5 + 2.8)
       : 0;
@@ -3113,6 +3122,10 @@ export function renderJpsToSvg(input: string): string {
     const noteXs: number[] = [];
     let compactBeatProgress = 0;
     let compactBeamStartX: number | null = null;
+    let compactCustomBeatOpen = false;
+    let compactSlashNoteCount = 0;
+    let compactSecondaryBeamStartX: number | null = null;
+    let compactSecondaryBeamLastX: number | null = null;
     const dottedNoteCount = rowEvents.filter((event) => event.type === "note" && event.durationMark.includes(".")).length;
     const noteCount = rowEvents.filter((event) => event.type === "note").length;
     const useMeasureBeatBeams = dottedNoteCount > 1
@@ -3211,7 +3224,9 @@ export function renderJpsToSvg(input: string): string {
         });
         const isEndBar = event.code.startsWith("|j");
         const isHiddenBar = event.code.startsWith("|/") || event.code.startsWith("|*");
-        const rowClosingBarX = rowIsCompactPlainDense ? compactRight : closingBarX;
+        const rowClosingBarX = rowIsCompactPlainDense
+          ? hasCustomBeatControls ? compactRight - 30 : compactRight
+          : closingBarX;
         const barX = compactProseX ?? (naturalAdvances
           ? isLeadingBar ? left : isClosingBar && !isRaggedClosingRow ? rowClosingBarX : x
           : isLeadingBar
@@ -3220,7 +3235,7 @@ export function renderJpsToSvg(input: string): string {
               ? rowClosingBarX
               : usesDenseTripletSpacing
                 ? x - groupedNoteStep * 0.1
-                : x - internalBarOffset);
+                : x - (hasCustomBeatControls ? compactNoteStep * 0.1 : internalBarOffset));
         if (!isHiddenBar) {
           const uncorrectedBarXValue = naturalAdvances && !isEndBar && !isClosingBar ? naturalXText : barX;
           const barXValue = usesLegacyArticulationSpacing
@@ -3282,7 +3297,11 @@ export function renderJpsToSvg(input: string): string {
           groupedXScaled += groupedNoteStepScaled * BigInt(13) / BIGINT_TEN;
           x = scaledToNumber(groupedXScaled);
         } else {
-          x += isHiddenBar ? (event.code === "|*" ? barAdvance : 0) : isEndBar || isLeadingBar || isClosingBar ? 0 : barAdvance;
+          x += isHiddenBar
+            ? (event.code === "|*" ? barAdvance : 0)
+            : isEndBar || isLeadingBar || isClosingBar
+              ? 0
+              : hasCustomBeatControls ? compactNoteStep * 1.3 : barAdvance;
         }
         return;
       }
@@ -3762,16 +3781,37 @@ export function renderJpsToSvg(input: string): string {
       }
 
       if (rowIsCompactPlainDense && event.type === "note") {
-        if (compactBeamStartX === null) {
+        const isSlashNote = event.durationMark.includes("/");
+        if (isSlashNote && compactBeamStartX === null) {
           compactBeamStartX = lastNoteX;
+        }
+        if (isSlashNote) {
+          compactSlashNoteCount += 1;
+        }
+        if (event.durationMark.includes("//")) {
+          compactSecondaryBeamStartX ??= lastNoteX;
+          compactSecondaryBeamLastX = lastNoteX;
         }
         compactBeatProgress += event.time;
         const isBeatBoundary = Math.abs(compactBeatProgress - Math.round(compactBeatProgress)) < 1e-9;
-        if (isBeatBoundary && compactBeamStartX !== null && lastNoteX !== null) {
+        compactCustomBeatOpen ||= Boolean(event.beatJoinAfter);
+        const endsCustomBeat = event.beatSplitAfter
+          || (compactCustomBeatOpen
+            ? !event.beatJoinAfter
+            : hasCustomBeatControls ? compactSlashNoteCount === 2 : isBeatBoundary);
+        if (endsCustomBeat && compactBeamStartX !== null && lastNoteX !== null) {
           durationLineChildren.push(slashBeamLine(compactBeamStartX - 6, rowY + 13, lastNoteX + 6));
+          if (compactSecondaryBeamStartX !== null && compactSecondaryBeamLastX !== null) {
+            durationLineChildren.push(slashBeamLine(compactSecondaryBeamStartX - 6, rowY + 16, compactSecondaryBeamLastX + 6));
+          }
           compactBeamStartX = null;
+          compactCustomBeatOpen = false;
+          compactBeatProgress = 0;
+          compactSlashNoteCount = 0;
+          compactSecondaryBeamStartX = null;
+          compactSecondaryBeamLastX = null;
         }
-        x += compactNoteStep * (isBeatBoundary ? 1.5 : 1);
+        x += compactNoteStep * (endsCustomBeat ? 1.5 : 1);
         return;
       }
 
@@ -3888,7 +3928,7 @@ export function renderJpsToSvg(input: string): string {
           (rowHasMezzoPiano && measureSlashNoteCount === 6 && mixedBeamNoteCount === 2)
           ||
           (isOrdinaryDottedSlash && !joinsFollowingSixteenth)
-          || (isBeatBoundary && !carriesPrimaryIntoTertiarySlur)
+          || (event.beatSplitAfter || (isBeatBoundary && !event.beatJoinAfter && !carriesPrimaryIntoTertiarySlur))
           || (
             usesAccompanimentNotation
             && event.pitch === null
@@ -3957,9 +3997,19 @@ export function renderJpsToSvg(input: string): string {
   const glyphDiscoveryChildren = [...svgChildren, ...durationLineChildren, ...naturalPitchDecorationChildren, ...octaveGlyphChildren, ...groupedDecorationChildren, ...markingChildren, ...expressionChildren, ...jumpHouseChildren];
   const usedGlyphIds = Array.from(new Set(Array.from(glyphDiscoveryChildren.join("\n").matchAll(/xlink:href="#([^"]+)"/g)).map((match) => match[1])));
 
-  return `<svg width="${width}" height="${height}" version="1.1" viewBox="${viewBox}" encoding="UTF-8" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" height="100%" width="100%" fill="#ffffff" />${defaultGlyphDefs(usedGlyphIds, generatedGlyphDefs)}\n${outputChildren.join("\n")}
+  const svg = `<svg width="${width}" height="${height}" version="1.1" viewBox="${viewBox}" encoding="UTF-8" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" height="100%" width="100%" fill="#ffffff" />${defaultGlyphDefs(usedGlyphIds, generatedGlyphDefs)}\n${outputChildren.join("\n")}
 <g id="custom"></g></svg>
 `;
+  return events.some((event) => event.beatJoinAfter || event.beatSplitAfter)
+    ? serializeLegacySvg(svg)
+    : svg;
+}
+
+function serializeLegacySvg(svg: string): string {
+  return svg
+    .replace(/<([a-z]+)([^>]*)\/>/g, (_match, tag: string, attributes: string) => `<${tag}${attributes.trimEnd()}></${tag}>`)
+    .replace(/\s+>/g, ">")
+    .replace(/\n/g, "\r\n");
 }
 
 function svgUse(x: number | string, y: number | string, id: string, attrs: string): string {

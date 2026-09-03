@@ -9,7 +9,7 @@ const publicJpsDir = path.join(workspaceRoot, "public", sourceName);
 const fixtureDirectoryNames = ["jps-files", "songs"];
 const oracleCacheDirs = fixtureDirectoryNames.map((directory) => path.join(workspaceRoot, "oracle-cache", directory));
 
-const { parseJps, translate } = await import("../lib/translate.ts");
+const { parseJps, parseJpsEvents, translate } = await import("../lib/translate.ts");
 
 function extractSvgTitle(svg) {
   const match = svg.match(/<text[^>]*>([^<]+)<\/text>/);
@@ -140,10 +140,40 @@ if (sourceName === "jps-files") {
   }
 }
 
+if (sourceName === "songs") {
+  const customBeatInput = await readFile(path.join(publicJpsDir, "abc-examples.jps"), "utf8");
+  const customBeatEvents = parseJpsEvents(customBeatInput).filter((event) => event.type === "note");
+  const joinIndexes = customBeatEvents
+    .map((event, index) => event.beatJoinAfter ? index : -1)
+    .filter((index) => index >= 0);
+  const splitIndexes = customBeatEvents
+    .map((event, index) => event.beatSplitAfter ? index : -1)
+    .filter((index) => index >= 0);
+  if (joinIndexes.join(",") !== "1,3,4" || splitIndexes.join(",") !== "6") {
+    failures.push("abc-examples custom beat markers were not parsed on the expected notes");
+  }
+
+  const customBeatOutput = translate(customBeatInput);
+  const beamLines = [...customBeatOutput.matchAll(/<line x1="([^"]+)"[^>]*x2="([^"]+)"[^>]*data-type="jianshixian"/g)]
+    .map((match) => ({ x1: Number(match[1]), x2: Number(match[2]) }));
+  if (
+    beamLines.length !== 7
+    || beamLines[0].x1 !== 112
+    || beamLines[0].x2 !== 174
+    || beamLines[1].x1 !== 199.5
+    || beamLines[1].x2 !== 261.5
+  ) {
+    failures.push("abc-examples join markers did not produce the expected three-note primary beams");
+  }
+  if (beamLines[2].x2 - beamLines[2].x1 !== 12 || beamLines[3].x2 - beamLines[3].x1 !== 12) {
+    failures.push("abc-examples split marker did not isolate the opening sixteenth beams");
+  }
+}
+
 console.log(`Checked ${jpsFiles.length} ${sourceName} JPS files: ${exactMatches} exact, ${jpsFiles.length - exactMatches - missingCaches} mismatched, ${missingCaches} missing caches`);
 
 if (failures.length > 0) {
   throw new Error(`${sourceName} JPS verification failed:\n- ${failures.join("\n- ")}`);
 }
 
-console.log(`Verified ${jpsFiles.length} ${sourceName} JPS files against cached parity${sourceName === "jps-files" ? " and live edit propagation" : ""}`);
+console.log(`Verified ${jpsFiles.length} ${sourceName} JPS files against cached parity${sourceName === "jps-files" ? " and live edit propagation" : ""}${sourceName === "songs" ? ", plus abc-examples custom beat behavior" : ""}`);

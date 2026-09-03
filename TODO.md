@@ -47,7 +47,7 @@
 
 - [x] Notes `1-7`, rests `0`, hidden rests `8`, holds `-`, octave marks, accidentals, dots, and slash durations.
 - [x] Rhythm note `9` rendered as `X` with rhythmic duration and no pitch audio.
-- [ ] Custom beat joins `~` and forced splits `^`.
+- [x] Custom beat joins `~` and forced splits `^`.
 - [x] Parse and visibly render song dynamics `&p`, `&pp`, `&mp`, `&mf`, `&f`, and `&rit` with oracle-compatible note metadata and placement.
 - [x] Replace dynamics text with exact locally owned path glyphs and oracle-compatible definition ordering.
 - [x] Crescendo/diminuendo spans `<`, `>`, and `!`.
@@ -95,7 +95,7 @@
 - [ ] Reserve exact width for accidentals, octave marks, dots, annotations, slur boundaries, bars, and temporary meters.
 - [x] Finish `memory-from-cats.jps`, including natural-width coordinates, beam/slur structure, metadata, layering, and SVG serialization.
 - [x] Derive mixed-row beam grouping from beat boundaries and notation boundaries present in current fixtures.
-- [ ] Add `~`/`^` beam grouping overrides.
+- [x] Add `~`/`^` beam grouping overrides.
 - [ ] Match glyph definition selection and ordering.
 - [ ] Match notation element layering and SVG number formatting.
 - [x] Preserve byte-perfect grouped and simple fixtures throughout the layout rewrite.
@@ -108,10 +108,10 @@
 - [x] Reach byte-for-byte equality for every song with a corresponding cached SVG.
 - [ ] Document any spec ambiguity that cannot be inferred from the text or cached fixtures.
 
-Current verified baseline: 38 songs checked, 38 exact, 0 mismatched, and 0 missing caches. The exact song fixtures are `sandu-mojin.jps` through its canonical content-identical cache, `baihualin.jps`, `Londonderry.jps`, `LondonderryAir.jps`, `Londonderry-hanshan.jps`, `always-zhoushen.jps`, `047-keketuodemuyangren.jps`, `ganlanshu.jps`, `ganlanshu-qiyu.jps`, `guang-hui-sui-yue.jps`, `muge.jps`, `WaltzNo2.jps`, `tianyi.jps`, `hejiayi-barcarolle.jps`, `swan.jps`, `xiyangyang.jps`, `yidongdexin.jps`, `ren-jian-gong-ming.jps`, `ren-jian-gong-ming-bB.jps`, `yinjie-mojin-daokou.jps`, `sometime-when-it-rains.jps`, `sometime-when-it-rains-FixedDo.jps`, `sometime-when-it-rains-FixedDoH.jps`, `sometime-when-it-rains-FixedDoHK.jps`, `hejiayi-F-Swan-lake.jps`, `hejiayi-F-Swan-lake-alternativekeys.jps`, `hejiayi-swan-shengsan.jps`, `hejiayi-G-string-original.jps`, `hejiayi-G-string-alternativeKeys.jps`, `hejiayi-G-string-alternativeKeys2.jps`, `hejiayi-dream.jps`, `hejiayi-dream-AlternativeKey.jps`, `Haydn-Serenade-AlternativeKey.jps`, `Haydn-Serenade-Original.jps`, `huangwensheng-G-string.jps`, `hongyan.jps`, `tuerqi-jinxingqu-A.jps`, and `tuerqi-jinxingqu.jps`.
+Current verified baseline: 39 songs checked, 39 exact, 0 mismatched, and 0 missing caches. The exact song fixtures are `abc-examples.jps`, `sandu-mojin.jps` through its canonical content-identical cache, `baihualin.jps`, `Londonderry.jps`, `LondonderryAir.jps`, `Londonderry-hanshan.jps`, `always-zhoushen.jps`, `047-keketuodemuyangren.jps`, `ganlanshu.jps`, `ganlanshu-qiyu.jps`, `guang-hui-sui-yue.jps`, `muge.jps`, `WaltzNo2.jps`, `tianyi.jps`, `hejiayi-barcarolle.jps`, `swan.jps`, `xiyangyang.jps`, `yidongdexin.jps`, `ren-jian-gong-ming.jps`, `ren-jian-gong-ming-bB.jps`, `yinjie-mojin-daokou.jps`, `sometime-when-it-rains.jps`, `sometime-when-it-rains-FixedDo.jps`, `sometime-when-it-rains-FixedDoH.jps`, `sometime-when-it-rains-FixedDoHK.jps`, `hejiayi-F-Swan-lake.jps`, `hejiayi-F-Swan-lake-alternativekeys.jps`, `hejiayi-swan-shengsan.jps`, `hejiayi-G-string-original.jps`, `hejiayi-G-string-alternativeKeys.jps`, `hejiayi-G-string-alternativeKeys2.jps`, `hejiayi-dream.jps`, `hejiayi-dream-AlternativeKey.jps`, `Haydn-Serenade-AlternativeKey.jps`, `Haydn-Serenade-Original.jps`, `huangwensheng-G-string.jps`, `hongyan.jps`, `tuerqi-jinxingqu-A.jps`, and `tuerqi-jinxingqu.jps`.
 
 ## Active Order
 
-1. Preserve 38/38 cached song parity while extending renderer coverage.
+1. Preserve 39/39 cached song parity while extending renderer coverage.
 2. Implement remaining documented notation features with focused fixtures.
 3. Resolve or document specification ambiguities that are not represented by current caches.
