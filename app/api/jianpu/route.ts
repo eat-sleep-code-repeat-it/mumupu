@@ -1,7 +1,3 @@
-import { NextResponse } from "next/server";
-import { readFile } from "fs/promises";
-import path from "path";
-
 const DEFAULT_PAGE_CONFIG = {
   biaoti_font: "Microsoft YaHei",
   biaoti_size: "36",
@@ -21,8 +17,9 @@ const DEFAULT_PAGE_CONFIG = {
   shuzi_font: "b",
 };
 
-async function fetchRemoteSvg(jps: string): Promise<string> {
-  const code = jps.replace(/\r\n/g, "\n").replace(/\n/g, "&hh&");
+export async function POST(request: Request) {
+  const input = await request.text();
+  const code = input.replace(/\r\n/g, "\n").replace(/\n/g, "&hh&");
   const params = new URLSearchParams();
   params.set("code", code);
   params.set("customCode", "");
@@ -33,15 +30,17 @@ async function fetchRemoteSvg(jps: string): Promise<string> {
     method: "POST",
     headers: {
       Referer: "http://zhipu.lezhi99.com/Zhipu-index.html",
-      "User-Agent":
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.84 Safari/537.36",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.84 Safari/537.36",
       "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
     },
     body: params.toString(),
   });
 
   if (!response.ok) {
-    throw new Error(`JPS service request failed (${response.status})`);
+    return Response.json(
+      { error: `Zhipu request failed: ${response.status}` },
+      { status: 502 },
+    );
   }
 
   const text = await response.text();
@@ -51,37 +50,12 @@ async function fetchRemoteSvg(jps: string): Promise<string> {
     .filter((page) => page.trim().length > 0);
 
   if (pages.length === 0) {
-    throw new Error("JPS service returned no SVG pages.");
+    return Response.json(
+      { error: "Zhipu returned no SVG pages" },
+      { status: 502 },
+    );
   }
 
-  return pages[0].replace(/&/g, "+");
-}
-
-async function fallbackSvg(): Promise<string> {
-  const fallbackPath = path.join(
-    process.cwd(),
-    "..",
-    "jianpu-spec",
-    "out",
-    "cat.svg"
-  );
-  try {
-    return await readFile(fallbackPath, "utf-8");
-  } catch {
-    return "";
-  }
-}
-
-export async function POST(request: Request) {
-  const jps = await request.text();
-  let svg = "";
-
-  try {
-    svg = await fetchRemoteSvg(jps);
-  } catch (error) {
-    console.error("Jianpu remote render failed:", error);
-    svg = await fallbackSvg();
-  }
-
-  return NextResponse.json({ svg });
+  const svg = pages[0].replace(/&/g, "+");
+  return Response.json({ svg });
 }

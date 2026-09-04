@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "transpose": "node scripts/transpose.mjs",
+    "verify:translate": "node --experimental-strip-types scripts/verify-translate.mjs",
+    "verify:songs": "node --experimental-strip-types scripts/verify-translate.mjs --songs",
+    "parity:translate": "node --experimental-strip-types scripts/check-jianpu-parity.mjs"
   },
   "dependencies": {
     "next": "16.2.10",
