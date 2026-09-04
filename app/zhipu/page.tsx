@@ -2,6 +2,21 @@
 
 import { useEffect, useState } from "react";
 
+type SaveFileHandle = {
+  createWritable: () => Promise<{
+    write: (data: Blob) => Promise<void>;
+    close: () => Promise<void>;
+  }>;
+};
+
+type SaveFilePicker = (options: {
+  suggestedName: string;
+  types: Array<{
+    description: string;
+    accept: Record<string, string[]>;
+  }>;
+}) => Promise<SaveFileHandle>;
+
 export default function Zhipu() {
   const [text, setText] = useState("");
   const [transposedText, setTransposedText] = useState("");
@@ -10,26 +25,9 @@ export default function Zhipu() {
   const [svg, setSvg] = useState("");
   const [adjustment, setAdjustment] = useState("0");
   const [transposeError, setTransposeError] = useState("");
-  const [mode, setMode] = useState<"script" | "preview" | "zhipuRender" | "zhipuTransposedView">("script");
-  const [loadingMode, setLoadingMode] = useState<"preview" | "zhipuRender" | "zhipuTransposedView" | null>(null);
+  const [mode, setMode] = useState<"script" | "zhipuRender" | "zhipuTransposedView">("script");
+  const [loadingMode, setLoadingMode] = useState<"zhipuRender" | "zhipuTransposedView" | null>(null);
   const [isTransposing, setIsTransposing] = useState(false);
-
-  async function renderSvg(script: string): Promise<string> {
-    const response = await fetch("/api/translate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-      },
-      body: script,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Request failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.svg;
-  }
 
   useEffect(() => {
     fetch("/jps-files/memory-from-cats.jps")
@@ -74,25 +72,6 @@ export default function Zhipu() {
       setTransposedText("");
     } catch (error) {
       console.error("Failed to load selected song:", error);
-    }
-  }
-
-  async function handlePreview() {
-    if (loadingMode) {
-      return;
-    }
-
-    setLoadingMode("preview");
-    try {
-      const nextSvg = await renderSvg(text);
-      setSvg(nextSvg);
-      setMode("preview");
-    } catch (error) {
-      console.error("Preview failed:", error);
-      setSvg("<div style=\"color:red; padding:16px;\">Preview failed. Check console for details.</div>");
-      setMode("preview");
-    } finally {
-      setLoadingMode(null);
     }
   }
 
@@ -208,6 +187,59 @@ export default function Zhipu() {
     setMode("script");
   }
 
+  async function saveSvgAsFile(filename: string) {
+    const showSaveFilePicker = (
+      window as Window & { showSaveFilePicker?: SaveFilePicker }
+    ).showSaveFilePicker;
+
+    try {
+      const fileHandle = showSaveFilePicker
+        ? await showSaveFilePicker({
+            suggestedName: filename,
+            types: [
+              {
+                description: "SVG image",
+                accept: { "image/svg+xml": [".svg"] },
+              },
+            ],
+          })
+        : null;
+      const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+
+      if (fileHandle) {
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      console.error("Save failed:", error);
+    }
+  }
+
+  function svgFilename(suffix: string) {
+    const title = selectedSong.replace(/\.jps$/i, "") || "score";
+    return `${title.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")}${suffix}.svg`;
+  }
+
+  async function handleSave() {
+    await saveSvgAsFile(svgFilename(""));
+  }
+
+  async function handleExportSvg() {
+    await saveSvgAsFile(svgFilename("-transposed"));
+  }
+
   const buttonClass = (active: boolean) =>
     `rounded px-3 py-1 ${
       active
@@ -215,7 +247,6 @@ export default function Zhipu() {
         : "bg-gray-200 text-black hover:bg-gray-300"
     }`;
 
-  const isLoadingPreview = loadingMode === "preview";
   const isLoadingZhipuRender = loadingMode === "zhipuRender";
   const isLoadingZhipuTransposedView = loadingMode === "zhipuTransposedView";
   const isAnyLoading = loadingMode !== null || isTransposing;
@@ -238,22 +269,21 @@ export default function Zhipu() {
         </button>
         <button
           onClick={() => {
-            void handlePreview();
-          }}
-          disabled={isAnyLoading}
-          className={`${buttonClass(mode === "preview")} ${isAnyLoading ? "cursor-not-allowed opacity-60" : ""}`}>
-          {isLoadingPreview ? "Previewing..." : "Preview"}
-        </button>
-        <button
-          onClick={() => {
             void handleZhipuRender();
           }}
           disabled={isAnyLoading}
           className={`${buttonClass(mode === "zhipuRender")} ${isAnyLoading ? "cursor-not-allowed opacity-60" : ""}`}>
           {isLoadingZhipuRender ? "zhipuRendering..." : "zhipuRender"}
         </button>
-        <button className="rounded px-3 py-1 hover:bg-gray-200">Save</button>
-        <button className="rounded px-3 py-1 hover:bg-gray-200">Export</button>
+        {mode === "zhipuRender" && (
+          <button
+            onClick={() => {
+              void handleSave();
+            }}
+            className="rounded px-3 py-1 hover:bg-gray-200">
+            Save
+          </button>
+        )}
         <div className="ml-auto flex items-center gap-2">
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <span>Semitone shift</span>
@@ -290,6 +320,15 @@ export default function Zhipu() {
               disabled={isAnyLoading}
               className={`${buttonClass(mode === "zhipuTransposedView")} ${isAnyLoading ? "cursor-not-allowed opacity-60" : ""}`}>
               {isLoadingZhipuTransposedView ? "zhipuTransposedViewing..." : "zhipuTransposedView"}
+            </button>
+          )}
+          {mode === "zhipuTransposedView" && (
+            <button
+              onClick={() => {
+                void handleExportSvg();
+              }}
+              className="rounded px-3 py-1 hover:bg-gray-200">
+              ExportSvg
             </button>
           )}
         </div>
@@ -349,10 +388,6 @@ export default function Zhipu() {
                   />
                 </div>
               )}
-            </div>
-          ) : mode === "zhipuTransposedView" ? (
-            <div className="h-full min-h-0 w-full min-w-0 overflow-auto rounded border border-gray-300 bg-white p-3">
-              <div dangerouslySetInnerHTML={{ __html: svg }} />
             </div>
           ) : (
             <div className="h-full min-h-0 w-full min-w-0 overflow-auto rounded border border-gray-300 bg-white p-3">
