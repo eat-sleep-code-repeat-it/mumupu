@@ -147,12 +147,15 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileError, setFileError] = useState("");
   const [renderError, setRenderError] = useState("");
+  const [isRenderingSelectedFile, setIsRenderingSelectedFile] = useState(false);
+  const [renderRevision, setRenderRevision] = useState(0);
   const [preview, setPreview] = useState(true);
   const [mode, setMode] = useState<"script" | "preview">("preview");
   const [sidebarWidth, setSidebarWidth] = useState<number | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
   const resizeCleanupRef = useRef<(() => void) | null>(null);
   const fileRequestRef = useRef<AbortController | null>(null);
+  const selectedFileRenderGenerationRef = useRef(0);
 
   async function renderSvg(script: string, signal?: AbortSignal): Promise<string> {
     const response = await fetch("/api/translate", {
@@ -217,12 +220,16 @@ export default function Home() {
       return;
     }
 
+    const renderGeneration = selectedFileRenderGenerationRef.current;
     const controller = new AbortController();
     const timeout = window.setTimeout(() => {
       renderSvg(text, controller.signal)
         .then((nextSvg) => {
           setSvg(nextSvg);
           setRenderError("");
+          if (renderGeneration === selectedFileRenderGenerationRef.current) {
+            setIsRenderingSelectedFile(false);
+          }
         })
         .catch((error: unknown) => {
           if (error instanceof DOMException && error.name === "AbortError") {
@@ -230,6 +237,9 @@ export default function Home() {
           }
           console.error("Automatic translation failed:", error);
           setRenderError("Translation failed. Check the script and try again.");
+          if (renderGeneration === selectedFileRenderGenerationRef.current) {
+            setIsRenderingSelectedFile(false);
+          }
         });
     }, 400);
 
@@ -237,7 +247,7 @@ export default function Home() {
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [text]);
+  }, [text, renderRevision]);
 
   async function handlePreview() {
     try {
@@ -302,7 +312,12 @@ export default function Home() {
     fileRequestRef.current?.abort();
     const controller = new AbortController();
     fileRequestRef.current = controller;
+    selectedFileRenderGenerationRef.current += 1;
     setFileError("");
+    setRenderError("");
+    setIsRenderingSelectedFile(true);
+    setPreview(true);
+    setMode("preview");
 
     try {
       const response = await fetch(publicFileUrl(file.path), {
@@ -314,15 +329,17 @@ export default function Home() {
 
       const content = await response.text();
       setText(content);
+      setRenderRevision((current) => current + 1);
       setSelectedFile(file.path);
-      setPreview(true);
-      setMode("preview");
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
       console.error("Failed to load song:", error);
       setFileError(`Could not load ${file.name}.`);
+      if (fileRequestRef.current === controller) {
+        setIsRenderingSelectedFile(false);
+      }
     }
   }
 
@@ -480,7 +497,19 @@ export default function Home() {
 
         <div className="min-w-0 flex-1 p-4">
           {preview ? (
-            renderError ? (
+            isRenderingSelectedFile ? (
+              <div
+                className="flex h-full w-full items-center justify-center bg-white"
+                role="status"
+                aria-live="polite"
+              >
+                <span
+                  className="size-8 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600"
+                  aria-hidden="true"
+                />
+                <span className="sr-only">Rendering score...</span>
+              </div>
+            ) : renderError ? (
               <div className="p-4 text-red-700" role="alert">
                 {renderError}
               </div>
