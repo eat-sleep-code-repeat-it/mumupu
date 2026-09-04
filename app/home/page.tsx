@@ -1,11 +1,32 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 type JpsFile = {
   name: string;
   path: string;
 };
+
+type SaveFileHandle = {
+  createWritable: () => Promise<{
+    write: (data: Blob) => Promise<void>;
+    close: () => Promise<void>;
+  }>;
+};
+
+type SaveFilePicker = (options: {
+  suggestedName: string;
+  types: Array<{
+    description: string;
+    accept: Record<string, string[]>;
+  }>;
+}) => Promise<SaveFileHandle>;
 
 type JpsFolder = {
   name: string;
@@ -126,8 +147,11 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileError, setFileError] = useState("");
   const [renderError, setRenderError] = useState("");
-  const [preview, setPreview] = useState(false);
-  const [mode, setMode] = useState<"script" | "preview">("script");
+  const [preview, setPreview] = useState(true);
+  const [mode, setMode] = useState<"script" | "preview">("preview");
+  const [sidebarWidth, setSidebarWidth] = useState<number | null>(null);
+  const sidebarRef = useRef<HTMLElement | null>(null);
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
   const fileRequestRef = useRef<AbortController | null>(null);
 
   async function renderSvg(script: string, signal?: AbortSignal): Promise<string> {
@@ -186,6 +210,8 @@ export default function Home() {
     return () => controller.abort();
   }, []);
 
+  useEffect(() => () => resizeCleanupRef.current?.(), []);
+
   useEffect(() => {
     if (!text) {
       return;
@@ -229,12 +255,35 @@ export default function Home() {
   }
 
   async function handleSave() {
+    const title = text.match(/^B:\s*(.+)$/m)?.[1]?.trim() || "score";
+    const filename = `${title.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")}.svg`;
+    const showSaveFilePicker = (
+      window as Window & { showSaveFilePicker?: SaveFilePicker }
+    ).showSaveFilePicker;
+
     try {
+      const fileHandle = showSaveFilePicker
+        ? await showSaveFilePicker({
+            suggestedName: filename,
+            types: [
+              {
+                description: "SVG image",
+                accept: { "image/svg+xml": [".svg"] },
+              },
+            ],
+          })
+        : null;
       const svgToSave = await renderSvg(text);
       setSvg(svgToSave);
-      const title = text.match(/^B:\s*(.+)$/m)?.[1]?.trim() || "score";
-      const filename = `${title.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")}.svg`;
       const blob = new Blob([svgToSave], { type: "image/svg+xml;charset=utf-8" });
+
+      if (fileHandle) {
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      }
+
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -242,6 +291,9 @@ export default function Home() {
       link.click();
       URL.revokeObjectURL(url);
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
       console.error("Save failed:", error);
     }
   }
@@ -263,8 +315,8 @@ export default function Home() {
       const content = await response.text();
       setText(content);
       setSelectedFile(file.path);
-      setPreview(false);
-      setMode("script");
+      setPreview(true);
+      setMode("preview");
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
@@ -295,6 +347,56 @@ export default function Home() {
     setFileFilter(value);
     if (value.trim()) {
       setExpandedFolders((current) => new Set([...current, ...folderPaths(folders)]));
+    }
+  }
+
+  function clampSidebarWidth(width: number) {
+    const maximumWidth = Math.max(160, Math.min(480, window.innerWidth - 320));
+    return Math.min(maximumWidth, Math.max(160, width));
+  }
+
+  function handleResizeStart(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    resizeCleanupRef.current?.();
+
+    const startX = event.clientX;
+    const startWidth = sidebarRef.current?.getBoundingClientRect().width ?? 256;
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      setSidebarWidth(clampSidebarWidth(startWidth + moveEvent.clientX - startX));
+    };
+    const stopResizing = () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopResizing);
+      window.removeEventListener("pointercancel", stopResizing);
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      resizeCleanupRef.current = null;
+    };
+
+    resizeCleanupRef.current = stopResizing;
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopResizing);
+    window.addEventListener("pointercancel", stopResizing);
+  }
+
+  function handleResizeKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    const currentWidth = sidebarRef.current?.getBoundingClientRect().width ?? 256;
+    let nextWidth: number | null = null;
+
+    if (event.key === "ArrowLeft") nextWidth = currentWidth - 16;
+    if (event.key === "ArrowRight") nextWidth = currentWidth + 16;
+    if (event.key === "Home") nextWidth = 160;
+    if (event.key === "End") nextWidth = 480;
+
+    if (nextWidth !== null) {
+      event.preventDefault();
+      setSidebarWidth(clampSidebarWidth(nextWidth));
     }
   }
 
@@ -330,7 +432,11 @@ export default function Home() {
       </nav>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-44 shrink-0 flex-col border-r border-gray-300 bg-gray-50 sm:w-64">
+        <aside
+          ref={sidebarRef}
+          className="flex w-44 shrink-0 flex-col bg-gray-50 sm:w-64"
+          style={sidebarWidth === null ? undefined : { width: sidebarWidth }}
+        >
           <div className="border-b border-gray-300 p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-gray-900">JPS files</h2>
@@ -358,6 +464,19 @@ export default function Home() {
             />
           </div>
         </aside>
+
+        <div
+          role="separator"
+          aria-label="Resize file list"
+          aria-orientation="vertical"
+          aria-valuemin={160}
+          aria-valuemax={480}
+          aria-valuenow={sidebarWidth ?? undefined}
+          tabIndex={0}
+          onPointerDown={handleResizeStart}
+          onKeyDown={handleResizeKeyDown}
+          className="w-1 shrink-0 cursor-col-resize touch-none border-x border-gray-300 bg-gray-100 outline-none hover:bg-blue-400 focus:bg-blue-500"
+        />
 
         <div className="min-w-0 flex-1 p-4">
           {preview ? (
