@@ -1,0 +1,11 @@
+V: 1.0
+B: Amazing Grace
+D: G
+P: 3/4
+J:  
+Z: 首调 固定调唱名 
+#====== fragherrnmaurer violin sheet music | piano accompaniment
+#====== G python zhipu-transpose.py -a 2   -i songs/Amazing-Grace.jps
+Q:  | 0 0 (5,/ 1/) |: 1 - (y3/ 2/ 1/) | 3 - (3/ 2/) | 1 - 6, | 5, - (5,/ 1/) | 1 - (y3/ 2/ 1/) |
+Q:  | 3 - (y2/ 3/ 5/) | (5 - - | 5) - (3/ 5/) | 5 - (y3/ 2/ 1/) | 3 - (3/ 2/) | 1 - 6, | 5, - (5,/ 1/) |
+Q:  | 1 - (3/ 1/) | 3 - 2 |["a-b-c" 1 - - | 1 - 5,/ 1/ :|]["d" 1 - - | 1 - - ||]

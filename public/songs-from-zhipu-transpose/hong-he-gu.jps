@@ -1,0 +1,21 @@
+#============================ https://www.youtube.com/watch?v=ogiCLt2I6I4 ==========================
+V: 1.0
+B: 红河谷
+D: F
+P: 4/4
+J: 64
+Z:  加拿大民歌
+#============================ https://www.youtube.com/watch?v=ogiCLt2I6I4 ==========================
+#  A python zhipu-transpose.py -a -3 -i songs/hong-he-gu.jps
+#  B python zhipu-transpose.py -a -1 -i songs/hong-he-gu.jps
+#  D python zhipu-transpose.py -a 2 -i songs/hong-he-gu.jps
+#  E python zhipu-transpose.py -a 4 -i songs/hong-he-gu.jps
+#  F python zhipu-transpose.py -a 5 -i songs/hong-he-gu.jps
+Q:  | 5/&zkh"C-Major" 4/ | 3 3/ 2/ 1 2/ 3/ | 5/ (4. 4/) 0/ 6,/ 6,/ | 5, 7/ 1/ 2 3/ 2/ | (1 - 1/) 0/&ykh (5,/ 1/) | 3 3/ 3/ 3 (2/ 3/) |
+C:  @@@@@@@@@@@@@@@@@@@@@@人们说你就要离开
+Q:  | 2/ (1/ 1 1/) 0/ (5,/ 1/) | 3 (1/ 3/) 5 (4/ 3/) | 2 - - (5/ 4/) | 3 (3/ 2/) 1 (2/ 3/) | 5/ (4/ 4 4/) 0/ (6,/ 6,$/) |
+C:  村庄，@@@ 我们将怀念你的微笑， 你的眼睛比太阳更明亮，@@@照耀
+Q:  | 5, (7,/ 1/) 2 (3/ 2/) | (1 - 1/) 0/ 5,/ 1/ | 3 3 3 (2/ 3/) | 2/ (1/ (1) 1/~ 0/)"合唱" 5,/ 1/ | 3 1/ 3/ 5 (4/ 3/) |
+C:  在我@们心@上。 @@走过来坐在我的身旁，@@@不要离别得这~么匆
+Q:  | 2 - - 5/ 4/ | 3 3/ 2/ 1 2/ 3/ | 5/ (4/. 4/) 0/ 6,/ 6,$/ | 5, 7,/ 1/ 2 (3/ 2/) | 1 - - - ||
+C: 忙，要记住红河村，你的故乡，@@还有那热爱你~的姑娘。
