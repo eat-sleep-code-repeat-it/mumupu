@@ -16,8 +16,6 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
 ## Verify public JPS parity
 
 To verify every file in `public/jps-files/` against the external Jianpu renderer oracle and confirm live-edit propagation:
@@ -78,3 +76,7 @@ Response body:
 Open `/zhipu`, input a transpose number such as `-1` or `1`, then click `Transpose` to replace the current script with the transposed result.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+### other tools
+
+- https://github.com/flufy3d/JianpuRender
