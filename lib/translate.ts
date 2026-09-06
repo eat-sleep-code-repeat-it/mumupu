@@ -3220,7 +3220,7 @@ export function renderJpsToSvg(input: string): string {
     const groupedClusterSize = rowEvents.find((event) => event.type === "note" && event.groupStart)?.groupSize ?? null;
     const usesDenseTripletSpacing = groupedClusterSize === 3 && groupCount >= 10;
     const plainDenseNotes = rowEvents.filter((event) => event.type === "note" && !event.groupSize);
-    const usesSparseMixedGroupWidths = rowHasGroupedNotes && groupCount <= 2 && plainDenseNotes.length > 0;
+    const usesSparseMixedGroupWidths = rowHasGroupedNotes && groupCount <= 3 && plainDenseNotes.length > 0;
     const hasLyricLine = lyricLines.length > 0;
     const hasCustomBeatControls = plainDenseNotes.some((event) => event.beatJoinAfter || event.beatSplitAfter);
     const rowIsCompactPlainDense = !rowHasGroupedNotes
