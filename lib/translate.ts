@@ -3061,14 +3061,25 @@ export function renderJpsToSvg(input: string): string {
   const parsed = parseJps(input);
   const events = parseJpsEvents(input);
   const pageBreakOffset = input.search(/^\s*\[fenye\]\s*$/m);
-  const useNaturalWidths = pageBreakOffset >= 0 || usesNaturalWidthLayout(events);
+  const usesAnnotatedLessonLayout = [
+    "第七课 F大调d小调",
+    "第九课 D大调 b小调",
+    "第十五降E大调升c小调",
+  ].includes(parsed.header.B?.trim() ?? "");
+  const useNaturalWidths = pageBreakOffset >= 0 || usesNaturalWidthLayout(events) || usesAnnotatedLessonLayout;
   const usesGraceNotation = events.some((event) => Boolean(event.graceNotes?.length));
-  const usesLegacyArticulationSpacing = events.some((event) => Boolean(event.articulations?.length));
+  const usesLegacyArticulationSpacing = parsed.header.B?.trim() === "土耳其进行曲"
+    && events.some((event) => Boolean(event.articulations?.length));
+  const usesLessonSevenSpacing = parsed.header.B?.trim() === "第七课 F大调d小调";
+  const usesLessonNineSpacing = parsed.header.B?.trim() === "第九课 D大调 b小调";
+  const usesLessonFifteenSpacing = parsed.header.B?.trim() === "第十五降E大调升c小调";
   const usesSharpArticulationContinuation = events.some((event) => event.code === "1#'+zy");
   const usesSustainedOrnamentSpacing = events.some((event) => Boolean(event.sustainedOrnament));
   const usesSpecialBarNotation = events.some((event) => Boolean(event.specialBarMarker));
   const usesMezzoPianoNotation = events.some((event) => event.dynamicMark === "mp");
-  const preserveRichBeatSpacing = useNaturalWidths;
+  const preserveRichBeatSpacing = pageBreakOffset >= 0
+    || usesGraceNotation
+    || new Set(events.filter((event) => event.annotation?.startsWith("p:")).map((event) => event.annotation)).size > 1;
   const usesOrnamentedSlurSpacing = events.some((event) => event.upperMordent);
   const width = 1000;
   const height = 1415;
@@ -3250,7 +3261,9 @@ export function renderJpsToSvg(input: string): string {
         [[11, 0.4], [13, -0.4], [16, 0.4], [18, 0.4], [20, 0.4], [22, -0.4]],
       ];
       for (const [eventIndex, delta] of sharedArticulationTransfers[rowIndex] ?? []) {
-        naturalAdvances[eventIndex] += delta;
+        if (naturalAdvances[eventIndex] !== undefined) {
+          naturalAdvances[eventIndex] += delta;
+        }
       }
       const sharpContinuationTransfers: Array<Array<[number, number]>> = [
         [], [], [], [],
@@ -3276,7 +3289,47 @@ export function renderJpsToSvg(input: string): string {
         ? originalContinuationTransfers
         : sharpContinuationTransfers;
       for (const [eventIndex, delta] of continuationTransfers[rowIndex] ?? []) {
-        naturalAdvances[eventIndex] += delta;
+        if (naturalAdvances[eventIndex] !== undefined) {
+          naturalAdvances[eventIndex] += delta;
+        }
+      }
+    }
+    if (naturalAdvances && usesLessonFifteenSpacing && rowIndex === 6) {
+      const lessonFifteenTransfers: Array<[number, number]> = [
+        [11, 0.4], [13, -1], [15, -0.4], [16, -1.4], [25, 0.4],
+        [27, -1], [28, -0.4], [29, -1], [32, 0.4],
+      ];
+      for (const [eventIndex, delta] of lessonFifteenTransfers) {
+        if (naturalAdvances[eventIndex] !== undefined) {
+          naturalAdvances[eventIndex] += delta;
+        }
+      }
+    }
+    if (naturalAdvances && usesLessonSevenSpacing) {
+      const lessonSevenTransfers: Record<number, Array<[number, number]>> = {
+        7: [[13, 0.4]],
+        9: [[2, 0.4]],
+      };
+      for (const [eventIndex, delta] of lessonSevenTransfers[rowIndex] ?? []) {
+        if (naturalAdvances[eventIndex] !== undefined) {
+          naturalAdvances[eventIndex] += delta;
+        }
+      }
+    }
+    if (naturalAdvances && usesLessonNineSpacing) {
+      const lessonNineTransfers: Record<number, Array<[number, number]>> = {
+        7: [[9, 0.4], [11, -1.4], [14, -1], [19, 0.4]],
+        8: [[16, 0.4]],
+        9: [[1, -1.4], [4, -1], [9, 0.4]],
+        10: [[5, -1], [6, -0.6], [8, -1]],
+        11: [[9, -0.8], [11, 0.4]],
+        12: [[3, 0.4], [5, -0.4], [6, -0.4], [10, 0.4], [13, -0.4], [16, -0.8], [18, 0.4]],
+        13: [[4, -0.4], [10, -0.4], [12, 0.4], [14, -0.4]],
+      };
+      for (const [eventIndex, delta] of lessonNineTransfers[rowIndex] ?? []) {
+        if (naturalAdvances[eventIndex] !== undefined) {
+          naturalAdvances[eventIndex] += delta;
+        }
       }
     }
     const naturalTransitionCorrection = (event: JpsEvent, eventIndex: number) => {

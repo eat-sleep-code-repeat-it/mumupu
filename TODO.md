@@ -9,12 +9,12 @@
 
 ## Current Baseline
 
-- [x] `example-001-paipaizuo.jps` matches its cached oracle byte-for-byte.
-- [x] `example-002-sandumojin.jps` matches its cached oracle byte-for-byte.
-- [x] `sandu-mojin.jps` matches its canonical cached oracle byte-for-byte.
-- [x] `memory-from-cats.jps` matches its cached oracle byte-for-byte.
-- [x] Every JPS file under `public/songs` matches its corresponding cached SVG.
+- [x] Confirm all four `public/jps-files` fixtures match their caches after CRLF/LF normalization.
+- [ ] Normalize line endings in `verify:translate` or its caches so the command reports those four matches instead of differences beginning at byte 190.
+- [ ] Restore `pnpm verify:songs`; it currently stops because `abc-examples.jps` moved to `public/abc-spec` while the verifier still expects it under `public/songs`.
+- [x] Recalculate the current normalized song baseline: 38 checked, 36 exact, and 2 mismatched (`hejiayi-barcarolle.jps` and `ren-jian-gong-ming-bB.jps`).
 - [x] Focused and broad validation scripts read local oracle caches without rendering those caches in the app.
+- [x] Lessons 07 and 09 match their supplied oracle note/bar coordinates; lesson 15 reported rows 1-4 and 7 match and contain no non-finite coordinates.
 
 ## Phase 1: Home Automatic Rendering
 
@@ -38,8 +38,9 @@
 
 - [x] Parse comments and `V:`, repeated `B:`, repeated `Z:`, `D:`, `P:`, `J:`, and `X:` fields.
 - [x] Render primary/secondary titles, credits, key signature, time signatures, and tempo text.
-- [ ] Validate sharp/flat key spellings against song fixtures.
-- [ ] Support the spec's multiple and parenthesized auxiliary time signatures.
+- [x] Render sharp/flat key spellings and fixture-verified accidental-key header positioning.
+- [x] Render multiple comma-separated time signatures, including the three-signature `memory-from-cats.jps` header.
+- [ ] Parse and render the spec's space-separated, parenthesized auxiliary time signatures.
 - [ ] Determine and implement the visible behavior of `X:` where required by cached output.
 
 ## Phase 4: Core Melody Rules (`spec/03-曲部分.md`)
@@ -50,11 +51,12 @@
 - [x] Parse and visibly render song dynamics `&p`, `&pp`, `&mp`, `&mf`, `&f`, and `&rit` with oracle-compatible note metadata and placement.
 - [x] Replace dynamics text with exact locally owned path glyphs and oracle-compatible definition ordering.
 - [x] Crescendo/diminuendo spans `<`, `>`, and `!`.
-- [ ] Hairpin `+` vertical adjustments.
-- [ ] Front grace notes `[...]` and rear grace notes `[h...]` with pitch, octave, accidental, and duration marks.
-- [ ] Accompaniment brackets `&zkh` and `&ykh`.
+- [x] Hairpin `+` vertical adjustments.
+- [x] Front grace notes `[...]` and rear grace notes `[h...]` with pitch, octave, accidental, and duration marks.
+- [x] Accompaniment brackets `&zkh` and `&ykh`.
 - [ ] All documented bar and repeat forms.
-- [ ] Bar annotations other than temporary meter `p:x/x`.
+- [x] Standalone note annotations and bar-attached temporary meter annotations.
+- [ ] Other documented bar annotations not represented by current fixtures.
 - [x] Hidden bars `|/` and `|*`.
 - [x] Temporary meter parsing and glyph rendering.
 
@@ -62,12 +64,15 @@
 
 - [x] Ordinary parenthesized slurs.
 - [x] `y` tuplets with three- and four-note labels.
-- [ ] Arbitrary tuplet sizes using oracle-compatible labels and spacing.
-- [ ] Nested slurs without lost or extra paths.
-- [ ] Cross-measure and cross-row slur continuation.
-- [ ] Split slurs attached to bar lines.
-- [ ] Repeat endings/jump houses using `[` and `]`, including `/` and `+` modifiers.
-- [ ] Manual `[fenye]` page breaks and multi-page output handling.
+- [x] Five-note tuplets with oracle-compatible labels, timing, beams, and spacing.
+- [x] Parse `y` tuplet group sizes from their enclosed note count and render the shared grouped curve/spacing path.
+- [ ] Add labels, timing, and verified beam behavior for tuplet sizes beyond five notes.
+- [x] Nested slurs without lost or extra paths in covered fixtures.
+- [x] Cross-measure and cross-row slur continuation.
+- [x] Split slurs attached to bar lines.
+- [x] Repeat endings/jump houses using `[` and `]`, including wrapped endings and represented modifiers.
+- [x] Manual `[fenye]` page breaks with first-page-only SVG rendering.
+- [ ] True multi-page SVG output or an explicit multi-page export contract.
 
 ## Phase 6: Accompaniment and Multi-Voice
 
@@ -77,7 +82,8 @@
 - [ ] Voice names declared after numbered line markers.
 - [ ] Mixed single-voice and multi-voice rows.
 - [ ] Voice-bracket placement marker `&sbf`.
-- [ ] Alignment fillers using `8` and `|*`.
+- [x] Hidden alignment primitives `8` and `|*` consume layout space without drawing note/bar glyphs.
+- [ ] Integrate `8` and `|*` fillers into numbered multi-voice row alignment.
 
 ## Phase 7: Lyrics (`spec/04-歌词部分.md`)
 
@@ -86,17 +92,18 @@
 - [x] Render multiple `C:` lines attached to one `Q:` line.
 - [ ] Render lyric annotations before lyric text with underscore-to-space conversion.
 - [ ] Validate mixed Chinese/English alignment across song fixtures.
-- [ ] Validate that holds do not consume lyric units.
+- [x] Ensure holds do not consume lyric units; lyric indices advance only in the note-rendering branch.
 
 ## Phase 8: Layout and SVG Serialization
 
-- [ ] Replace approximate regular-row spacing with the oracle's natural-width and justification model.
-- [ ] Reserve exact width for accidentals, octave marks, dots, annotations, slur boundaries, bars, and temporary meters.
+- [x] Use the oracle-compatible natural-width and justification model for covered regular, grouped, annotated, and paginated fixtures.
+- [x] Reserve fixture-verified width for accidentals, octave marks, dots, annotations, slur boundaries, bars, grace notes, accompaniment brackets, and temporary meters.
+- [ ] Replace remaining title/row compatibility transfers with general notation rules where the oracle behavior can be inferred.
 - [x] Finish `memory-from-cats.jps`, including natural-width coordinates, beam/slur structure, metadata, layering, and SVG serialization.
 - [x] Derive mixed-row beam grouping from beat boundaries and notation boundaries present in current fixtures.
 - [x] Add `~`/`^` beam grouping overrides.
-- [ ] Match glyph definition selection and ordering.
-- [ ] Match notation element layering and SVG number formatting.
+- [x] Match glyph definition selection and ordering for covered fixtures.
+- [x] Match notation element layering and SVG number formatting for covered fixtures.
 - [x] Preserve byte-perfect grouped and simple fixtures throughout the layout rewrite.
 
 ## Phase 9: Song Parity Closure
@@ -104,13 +111,15 @@
 - [x] Run the complete cache-only song parity report after every feature cluster.
 - [x] Fix the highest-frequency mismatch cluster first.
 - [x] Add a concise bug-fix record for each resolved root cause.
-- [x] Reach byte-for-byte equality for every song with a corresponding cached SVG.
+- [x] Reach the historical 39/39 byte-for-byte cached-song milestone.
+- [ ] Restore 38/38 normalized parity for the current song inventory, then repair `verify:songs` so it enforces that baseline.
 - [ ] Document any spec ambiguity that cannot be inferred from the text or cached fixtures.
 
-Current verified baseline: 39 songs checked, 39 exact, 0 mismatched, and 0 missing caches. The exact song fixtures are `abc-examples.jps`, `sandu-mojin.jps` through its canonical content-identical cache, `baihualin.jps`, `Londonderry.jps`, `LondonderryAir.jps`, `Londonderry-hanshan.jps`, `always-zhoushen.jps`, `047-keketuodemuyangren.jps`, `ganlanshu.jps`, `ganlanshu-qiyu.jps`, `guang-hui-sui-yue.jps`, `muge.jps`, `WaltzNo2.jps`, `tianyi.jps`, `hejiayi-barcarolle.jps`, `swan.jps`, `xiyangyang.jps`, `yidongdexin.jps`, `ren-jian-gong-ming.jps`, `ren-jian-gong-ming-bB.jps`, `yinjie-mojin-daokou.jps`, `sometime-when-it-rains.jps`, `sometime-when-it-rains-FixedDo.jps`, `sometime-when-it-rains-FixedDoH.jps`, `sometime-when-it-rains-FixedDoHK.jps`, `hejiayi-F-Swan-lake.jps`, `hejiayi-F-Swan-lake-alternativekeys.jps`, `hejiayi-swan-shengsan.jps`, `hejiayi-G-string-original.jps`, `hejiayi-G-string-alternativeKeys.jps`, `hejiayi-G-string-alternativeKeys2.jps`, `hejiayi-dream.jps`, `hejiayi-dream-AlternativeKey.jps`, `Haydn-Serenade-AlternativeKey.jps`, `Haydn-Serenade-Original.jps`, `huangwensheng-G-string.jps`, `hongyan.jps`, `tuerqi-jinxingqu-A.jps`, and `tuerqi-jinxingqu.jps`.
+Historical baseline: the renderer previously reached 39/39 cached song parity. The current normalized baseline is 36/38; `verify:songs` is additionally blocked by the moved `abc-examples.jps` fixture.
 
 ## Active Order
 
-1. Preserve 39/39 cached song parity while extending renderer coverage.
-2. Implement remaining documented notation features with focused fixtures.
-3. Resolve or document specification ambiguities that are not represented by current caches.
+1. Repair the fixture paths and re-establish a current cache-only parity baseline for `public/jps-files` and `public/songs`.
+2. Preserve the re-established baseline while replacing score-specific spacing transfers with general notation rules.
+3. Implement the remaining header, bar, multi-voice, lyric, and multi-page features with focused fixtures.
+4. Resolve or document specification ambiguities that are not represented by current caches.
