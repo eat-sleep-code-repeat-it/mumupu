@@ -21,7 +21,7 @@ export default async function Home() {
   return (
     <main className="min-h-screen px-6 py-12 sm:px-10">
       <div className="mx-auto max-w-5xl">
-        <h1 className="mb-8 text-4xl font-semibold">MUMU PU</h1>
+        {/* <h1 className="mb-8 text-4xl font-semibold">MUMU PU</h1> */}
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-sm">
             <thead>
