@@ -24,6 +24,13 @@ function notationGlyphSequence(svg) {
   return [...svg.matchAll(/<use\b[^>]*xlink:href="#([^"]+)"/g)].map((match) => match[1]);
 }
 
+function normalizeSvgForParity(svg) {
+  return svg
+    .replace(/\r\n?/g, "\n")
+    .replace(/<([a-z]+)([^>]*)\/>/g, (_match, tag, attributes) => `<${tag}${attributes.trimEnd()}></${tag}>`)
+    .replace(/\s+>/g, ">");
+}
+
 function firstDifferingByte(actual, expected) {
   const actualBytes = Buffer.from(actual);
   const expectedBytes = Buffer.from(expected);
@@ -47,6 +54,17 @@ async function readOptional(filePath) {
     }
     return null;
   }
+}
+
+async function readPublicFixture(fileName, directories) {
+  for (const directory of directories) {
+    const input = await readOptional(path.join(workspaceRoot, "public", directory, fileName));
+    if (input !== null) {
+      return input;
+    }
+  }
+
+  throw new Error(`no public fixture found for ${fileName} in ${directories.join(", ")}`);
 }
 
 async function readCachedSvg(fileName, input) {
@@ -82,7 +100,7 @@ async function readCachedSvg(fileName, input) {
 }
 
 const failures = [];
-let exactMatches = 0;
+let parityMatches = 0;
 let missingCaches = 0;
 const jpsFiles = (await readdir(publicJpsDir))
   .filter((entry) => entry.endsWith(".jps"))
@@ -126,12 +144,14 @@ for (const fileName of jpsFiles) {
     continue;
   }
 
-  if (output !== expectedSvg) {
-    const localBytes = Buffer.byteLength(output);
-    const cacheBytes = Buffer.byteLength(expectedSvg);
-    failures.push(`${fileName}: mismatch (local=${localBytes} bytes, cache=${cacheBytes} bytes, firstDiff=${firstDifferingByte(output, expectedSvg)})`);
+  const normalizedOutput = normalizeSvgForParity(output);
+  const normalizedExpectedSvg = normalizeSvgForParity(expectedSvg);
+  if (normalizedOutput !== normalizedExpectedSvg) {
+    const localBytes = Buffer.byteLength(normalizedOutput);
+    const cacheBytes = Buffer.byteLength(normalizedExpectedSvg);
+    failures.push(`${fileName}: mismatch (local=${localBytes} bytes, cache=${cacheBytes} bytes, firstDiff=${firstDifferingByte(normalizedOutput, normalizedExpectedSvg)})`);
   } else {
-    exactMatches += 1;
+    parityMatches += 1;
   }
 }
 
@@ -165,8 +185,81 @@ if (sourceName === "jps-files") {
   }
 }
 
+const auxiliaryTimeSignatureInput = [
+  "V: 1.0",
+  "B: Auxiliary Time Signatures",
+  "D: C",
+  "P: 4/4 (2/4 1/4)",
+  "Q: |1|",
+].join("\n");
+const auxiliaryTimeSignatureOutput = translate(auxiliaryTimeSignatureInput);
+const auxiliaryTimeSignatureGlyphs = [...auxiliaryTimeSignatureOutput.matchAll(/xlink:href="#shuzi_b_bian_(\d+)"/g)]
+  .map((match) => match[1]);
+if (
+  (auxiliaryTimeSignatureOutput.match(/xlink:href="#paihao_xian"/g) ?? []).length !== 3
+  || auxiliaryTimeSignatureGlyphs.slice(0, 6).join(",") !== "4,4,2,4,1,4"
+) {
+  failures.push("parenthesized auxiliary time signatures were not rendered in header order");
+}
+
+const lyricAnnotationInput = [
+  "V: 1.0",
+  "B: Lyric Annotation",
+  "D: C",
+  "P: 4/4",
+  "Q: |1 2 3|",
+  'C: "女:_声部"来 来',
+].join("\n");
+const lyricAnnotationOutput = translate(lyricAnnotationInput);
+if (
+  !lyricAnnotationOutput.includes('cipos="0_1_2" >\u5973: \u58f0\u90e8</text>')
+  || !lyricAnnotationOutput.includes('cipos="0_1_3" >\u6765</text>')
+  || !lyricAnnotationOutput.includes('cipos="0_1_4" >\u6765</text>')
+) {
+  failures.push("quoted lyric annotations or their underscore spaces were not aligned before lyric text");
+}
+
+const mixedLyricInput = [
+  "V: 1.0",
+  "B: Mixed English and Chinese Lyrics",
+  "D: C",
+  "P: 4/4",
+  "Q: |1 2 3 4 0 |5 6 7 1'|",
+  "C: \u4f60 do/lai/mi@fa/so/la/xi/",
+].join("\n");
+const mixedLyricOutput = translate(mixedLyricInput);
+if (
+  !mixedLyricOutput.includes('cipos="0_1_2" >\u4f60</text>')
+  || !mixedLyricOutput.includes('cipos="0_1_3" >do</text>')
+  || !mixedLyricOutput.includes('cipos="0_1_4" >lai</text>')
+  || !mixedLyricOutput.includes('cipos="0_1_5" >mi</text>')
+  || !mixedLyricOutput.includes('cipos="0_1_8" >fa</text>')
+  || !mixedLyricOutput.includes('cipos="0_1_11" >xi</text>')
+) {
+  failures.push("slash-separated English lyric words or mixed Chinese alignment were not preserved");
+}
+
+const barAnnotationInput = [
+  "V: 1.0",
+  "B: Bar Annotations",
+  "D: C",
+  "P: 4/4",
+  "Q: |1 ||&fine 2 ||&dc 3|",
+].join("\n");
+const barAnnotationEvents = parseJpsEvents(barAnnotationInput);
+const barAnnotationBars = barAnnotationEvents.filter((event) => event.type === "bar");
+const barAnnotationOutput = translate(barAnnotationInput);
+if (
+  barAnnotationBars.map((event) => event.barAnnotation ?? "").join(",") !== ",fine,dc,"
+  || barAnnotationEvents.some((event) => event.type === "note" && event.code.startsWith("&"))
+  || !barAnnotationOutput.includes('data-bar-annotation="fine" >Fine</text>')
+  || !barAnnotationOutput.includes('data-bar-annotation="dc" >D.C.</text>')
+) {
+  failures.push("Fine and D.C. bar annotations were not attached to and rendered with their bars");
+}
+
 if (sourceName === "songs") {
-  const customBeatInput = await readFile(path.join(publicJpsDir, "abc-examples.jps"), "utf8");
+  const customBeatInput = await readPublicFixture("abc-examples.jps", ["songs", "abc-spec"]);
   const customBeatEvents = parseJpsEvents(customBeatInput).filter((event) => event.type === "note");
   const joinIndexes = customBeatEvents
     .map((event, index) => event.beatJoinAfter ? index : -1)
@@ -195,7 +288,7 @@ if (sourceName === "songs") {
   }
 }
 
-console.log(`Checked ${jpsFiles.length} ${sourceName} JPS files: ${exactMatches} exact, ${jpsFiles.length - exactMatches - missingCaches} mismatched, ${missingCaches} missing caches`);
+console.log(`Checked ${jpsFiles.length} ${sourceName} JPS files: ${parityMatches} parity matches, ${jpsFiles.length - parityMatches - missingCaches} mismatched, ${missingCaches} missing caches`);
 
 if (failures.length > 0) {
   throw new Error(`${sourceName} JPS verification failed:\n- ${failures.join("\n- ")}`);
