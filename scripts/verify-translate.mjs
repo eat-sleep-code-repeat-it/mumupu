@@ -20,6 +20,10 @@ function hasNotationGlyphs(svg) {
   return svg.includes('href="#shuzi_b_') || svg.includes('xlink:href="#shuzi_b_');
 }
 
+function notationGlyphSequence(svg) {
+  return [...svg.matchAll(/<use\b[^>]*xlink:href="#([^"]+)"/g)].map((match) => match[1]);
+}
+
 function firstDifferingByte(actual, expected) {
   const actualBytes = Buffer.from(actual);
   const expectedBytes = Buffer.from(expected);
@@ -129,6 +133,27 @@ for (const fileName of jpsFiles) {
   } else {
     exactMatches += 1;
   }
+}
+
+const goldenJpsPath = path.join(workspaceRoot, "public", "100首练习", "0004-金婚曲.jps");
+const goldenInput = await readFile(goldenJpsPath, "utf8");
+const goldenReference = await readFile(`${goldenJpsPath}.svg`, "utf8");
+const goldenOutput = translate(goldenInput);
+const goldenEvents = parseJpsEvents(goldenInput);
+const actualGlyphSequence = notationGlyphSequence(goldenOutput);
+const referenceGlyphSequence = notationGlyphSequence(goldenReference);
+if (
+  actualGlyphSequence.length !== referenceGlyphSequence.length
+  || actualGlyphSequence.some((glyph, index) => glyph !== referenceGlyphSequence[index])
+) {
+  failures.push("0004-金婚曲.jps: rendered notation glyph sequence differs from its reference SVG");
+}
+if (
+  goldenEvents.filter((event) => event.type === "note").length !== 287
+  || goldenEvents.filter((event) => event.articulations?.includes("dy")).length !== 120
+  || goldenEvents.filter((event) => event.sustainedOrnament === "tr").length !== 3
+) {
+  failures.push("0004-金婚曲.jps: notes, staccato marks, or trill marks were not all parsed");
 }
 
 if (sourceName === "jps-files") {

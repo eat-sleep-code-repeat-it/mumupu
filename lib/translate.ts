@@ -144,7 +144,7 @@ export interface JpsEvent {
   accompanimentBracket?: "left" | "right";
   articulations?: Array<"dy" | "zy" | "bc" | "hx">;
   upperMordent?: boolean;
-  sustainedOrnament?: "cy" | "yc";
+  sustainedOrnament?: "cy" | "yc" | "tr";
   specialBarMarker?: "hs" | "ds";
   graceNotes?: JpsGraceNote[];
   jumpHouseStartLabel?: string;
@@ -2198,8 +2198,21 @@ function tokenizeJpsLine(line: string): string[] {
   let current = "";
   let inQuotes = false;
 
-  const appendSuffixToLastNoteToken = (suffix: string): void => {
-    for (let index = tokens.length - 1; index >= 0; index -= 1) {
+  const appendSuffixToLastNoteToken = (suffix: string, skipClosedBracketGroup = false): void => {
+    let lastNoteIndex = tokens.length - 1;
+    if (skipClosedBracketGroup && tokens[lastNoteIndex] === "]") {
+      let bracketDepth = 0;
+      for (let index = lastNoteIndex; index >= 0; index -= 1) {
+        if (tokens[index] === "]") {
+          bracketDepth += 1;
+        } else if (tokens[index] === "[" && --bracketDepth === 0) {
+          lastNoteIndex = index - 1;
+          break;
+        }
+      }
+    }
+
+    for (let index = lastNoteIndex; index >= 0; index -= 1) {
       if (["|", "(", ")", "[", "]", "{", "}"].includes(tokens[index])) {
         continue;
       }
@@ -2267,6 +2280,23 @@ function tokenizeJpsLine(line: string): string[] {
       tokens.push(current);
       current = "";
       i += 3;
+      continue;
+    }
+
+    const articulationMarker = line.slice(i, i + 3);
+    if (
+      !inQuotes
+      && ["&dy", "&zy", "&bc", "&hx"].includes(articulationMarker)
+      && /[0-8]/.test(line[i + 3] ?? "")
+    ) {
+      if (current.length > 0) {
+        current += articulationMarker;
+        tokens.push(current);
+        current = "";
+      } else {
+        appendSuffixToLastNoteToken(articulationMarker, true);
+      }
+      i += 2;
       continue;
     }
 
@@ -2433,14 +2463,14 @@ export function parseJpsEvents(input: string): JpsEvent[] {
       const accompanimentBracket = accompanimentMarker === "zkh" ? "left" : accompanimentMarker === "ykh" ? "right" : undefined;
       const accompanimentCode = accompanimentMarker ? `+${accompanimentMarker}` : "";
       const upperMordent = rawToken.endsWith("&sby");
-      const sustainedOrnament = rawToken.match(/&(cy|yc)(?=&|$|[-/.<>!])/)?.[1] as "cy" | "yc" | undefined;
+      const sustainedOrnament = rawToken.match(/&(cy|yc|tr)(?=&|$|[-/.<>!])/)?.[1] as "cy" | "yc" | "tr" | undefined;
       const ornamentCode = upperMordent ? "+sby" : "";
       const sustainedOrnamentCode = sustainedOrnament ? `+${sustainedOrnament}` : "";
       const specialBarMarker = rawToken.match(/&(hs|ds)$/)?.[1] as "hs" | "ds" | undefined;
       const token = rawToken
         .replace(/&(dy|zy|bc|hx)/g, "")
         .replace(/&(zkh|ykh)(?="|$)/, "")
-        .replace(/&(cy|yc)(?=&|$|[-/.<>!])/, "")
+        .replace(/&(cy|yc|tr)(?=&|$|[-/.<>!])/, "")
         .replace(/&(hs|ds)$/, "")
         .replace(/&sby$/, "");
       if (token === ":" && line.tokens[tokenIndex + 1] === "|") {
@@ -3832,7 +3862,7 @@ export function renderJpsToSvg(input: string): string {
           orderedPitchDecorationChildren.push(deferredSpecialMordentChild);
         }
         if (event.sustainedOrnament) {
-          const ornamentChild = svgUse(noteXText, rowY, event.sustainedOrnament === "cy" ? "changyinfu1" : "yanchang", "");
+          const ornamentChild = svgUse(noteXText, rowY, event.sustainedOrnament === "yc" ? "yanchang" : "changyinfu1", "");
           naturalPitchDecorationChildren.push(ornamentChild);
           orderedPitchDecorationChildren.push(ornamentChild);
         }
