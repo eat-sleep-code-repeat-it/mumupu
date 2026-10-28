@@ -602,9 +602,9 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={handleSaveScript}
-                  disabled={!selectedFile || isSavingScript}
+                  disabled
                   className="rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
-                  {isSavingScript ? "Saving Script..." : "Save Script"}
+                  Save Script
                 </button>
               </div>
               <textarea
