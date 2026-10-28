@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "transpose": "node scripts/transpose.mjs",
+    "verify:save-script": "node --experimental-strip-types scripts/verify-save-script.mjs",
     "verify:svg-pages": "node --experimental-strip-types scripts/verify-svg-pages.mjs",
     "verify:translate": "node --experimental-strip-types scripts/verify-translate.mjs",
     "verify:songs": "node --experimental-strip-types scripts/verify-translate.mjs --songs",

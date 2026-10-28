@@ -147,10 +147,14 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileError, setFileError] = useState("");
   const [renderError, setRenderError] = useState("");
+  const [scriptSaveError, setScriptSaveError] = useState("");
+  const [scriptSaveMessage, setScriptSaveMessage] = useState("");
+  const [isSavingScript, setIsSavingScript] = useState(false);
   const [isRenderingSelectedFile, setIsRenderingSelectedFile] = useState(false);
   const [renderRevision, setRenderRevision] = useState(0);
   const [preview, setPreview] = useState(true);
   const [mode, setMode] = useState<"script" | "preview">("preview");
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState<number | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
   const resizeCleanupRef = useRef<(() => void) | null>(null);
@@ -314,6 +318,35 @@ export default function Home() {
     }
   }
 
+  async function handleSaveScript() {
+    if (!selectedFile || isSavingScript) {
+      return;
+    }
+
+    setIsSavingScript(true);
+    setScriptSaveError("");
+    setScriptSaveMessage("");
+    try {
+      const response = await fetch("/api/songs/save", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ path: selectedFile, content: text }),
+      });
+      if (!response.ok) {
+        const data = await response.json() as { error?: unknown };
+        throw new Error(typeof data.error === "string" ? data.error : `Request failed: ${response.status}`);
+      }
+      setScriptSaveMessage(`Saved changes to ${selectedFile}.`);
+    } catch (error) {
+      console.error("Script save failed:", error);
+      setScriptSaveError(error instanceof Error ? error.message : "Could not save script.");
+    } finally {
+      setIsSavingScript(false);
+    }
+  }
+
   async function handleSelectFile(file: JpsFile) {
     fileRequestRef.current?.abort();
     const controller = new AbortController();
@@ -321,6 +354,8 @@ export default function Home() {
     selectedFileRenderGenerationRef.current += 1;
     setFileError("");
     setRenderError("");
+    setScriptSaveError("");
+    setScriptSaveMessage("");
     setIsRenderingSelectedFile(true);
     setPreview(true);
     setMode("preview");
@@ -438,9 +473,12 @@ export default function Home() {
       {/* Navigation */}
       <nav className="flex h-14 items-center gap-2 border-b bg-gray-100 px-4">
         <button
-          onClick={handleSave}
-          className="rounded px-3 py-1 hover:bg-gray-200">
-          Save
+          type="button"
+          onClick={() => setIsSidebarVisible((visible) => !visible)}
+          aria-expanded={isSidebarVisible}
+          aria-controls="viewer-file-panel"
+          className={buttonClass(isSidebarVisible)}>
+          {isSidebarVisible ? "Hide files" : "Show files"}
         </button>
         <button 
           onClick={handleScript}
@@ -455,92 +493,133 @@ export default function Home() {
       </nav>
 
       <div className="flex min-h-0 flex-1">
-        <aside
-          ref={sidebarRef}
-          className="flex w-44 shrink-0 flex-col bg-gray-50 sm:w-64"
-          style={sidebarWidth === null ? undefined : { width: sidebarWidth }}
-        >
-          <div className="border-b border-gray-300 p-3">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-gray-900">JPS files</h2>
-              <span className="text-xs text-gray-500">{visibleFileCount}</span>
-            </div>
-            <input
-              type="search"
-              value={fileFilter}
-              onChange={(event) => handleFileFilterChange(event.target.value)}
-              placeholder="Filter files"
-              aria-label="Filter song files"
-              className="w-full border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 outline-none focus:border-blue-600"
-            />
-            {fileError && (
-              <p className="mt-2 text-xs text-red-700" role="alert">{fileError}</p>
-            )}
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto py-1">
-            <FolderTree
-              folders={visibleFolders}
-              expandedFolders={expandedFolders}
-              selectedFile={selectedFile}
-              onToggleFolder={handleToggleFolder}
-              onSelectFile={handleSelectFile}
-            />
-          </div>
-        </aside>
+        {isSidebarVisible && (
+          <>
+            <aside
+              id="viewer-file-panel"
+              ref={sidebarRef}
+              className="flex w-44 shrink-0 flex-col bg-gray-50 sm:w-64"
+              style={sidebarWidth === null ? undefined : { width: sidebarWidth }}
+            >
+              <div className="border-b border-gray-300 p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold text-gray-900">JPS files</h2>
+                  <span className="text-xs text-gray-500">{visibleFileCount}</span>
+                </div>
+                <input
+                  type="search"
+                  value={fileFilter}
+                  onChange={(event) => handleFileFilterChange(event.target.value)}
+                  placeholder="Filter files"
+                  aria-label="Filter song files"
+                  className="w-full border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 outline-none focus:border-blue-600"
+                />
+                {fileError && (
+                  <p className="mt-2 text-xs text-red-700" role="alert">{fileError}</p>
+                )}
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto py-1">
+                <FolderTree
+                  folders={visibleFolders}
+                  expandedFolders={expandedFolders}
+                  selectedFile={selectedFile}
+                  onToggleFolder={handleToggleFolder}
+                  onSelectFile={handleSelectFile}
+                />
+              </div>
+            </aside>
 
-        <div
-          role="separator"
-          aria-label="Resize file list"
-          aria-orientation="vertical"
-          aria-valuemin={160}
-          aria-valuemax={480}
-          aria-valuenow={sidebarWidth ?? undefined}
-          tabIndex={0}
-          onPointerDown={handleResizeStart}
-          onKeyDown={handleResizeKeyDown}
-          className="w-1 shrink-0 cursor-col-resize touch-none border-x border-gray-300 bg-gray-100 outline-none hover:bg-blue-400 focus:bg-blue-500"
-        />
+            <div
+              role="separator"
+              aria-label="Resize file list"
+              aria-orientation="vertical"
+              aria-valuemin={160}
+              aria-valuemax={480}
+              aria-valuenow={sidebarWidth ?? undefined}
+              tabIndex={0}
+              onPointerDown={handleResizeStart}
+              onKeyDown={handleResizeKeyDown}
+              className="w-1 shrink-0 cursor-col-resize touch-none border-x border-gray-300 bg-gray-100 outline-none hover:bg-blue-400 focus:bg-blue-500"
+            />
+          </>
+        )}
 
         <div className="min-w-0 flex-1 p-4">
           {preview ? (
-            isRenderingSelectedFile ? (
-              <div
-                className="flex h-full w-full items-center justify-center bg-white"
-                role="status"
-                aria-live="polite"
-              >
-                <span
-                  className="size-8 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600"
-                  aria-hidden="true"
-                />
-                <span className="sr-only">Rendering score...</span>
+            <div className="flex h-full flex-col gap-2">
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700">
+                  Save SVG
+                </button>
               </div>
-            ) : renderError ? (
-              <div className="p-4 text-red-700" role="alert">
-                {renderError}
-              </div>
-            ) : (
-              <div className="h-full w-full overflow-auto bg-gray-100 p-4">
-                <div className="mx-auto max-w-[1000px]">
-                  {svgs.map((page, index) => (
-                    <div
-                      key={index}
-                      aria-label={`Score page ${index + 1}`}
-                      className="mb-4 bg-white shadow [&_svg]:block [&_svg]:h-auto [&_svg]:w-full"
-                      dangerouslySetInnerHTML={{ __html: page }}
+              <div className="min-h-0 flex-1">
+                {isRenderingSelectedFile ? (
+                  <div
+                    className="flex h-full w-full items-center justify-center bg-white"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <span
+                      className="size-8 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600"
+                      aria-hidden="true"
                     />
-                  ))}
-                </div>
+                    <span className="sr-only">Rendering score...</span>
+                  </div>
+                ) : renderError ? (
+                  <div className="p-4 text-red-700" role="alert">
+                    {renderError}
+                  </div>
+                ) : (
+                  <div className="h-full w-full overflow-auto bg-gray-100 p-4">
+                    <div className="mx-auto max-w-[1000px]">
+                      {svgs.map((page, index) => (
+                        <div
+                          key={index}
+                          aria-label={`Score page ${index + 1}`}
+                          className="mb-4 bg-white shadow [&_svg]:block [&_svg]:h-auto [&_svg]:w-full"
+                          dangerouslySetInnerHTML={{ __html: page }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            )
+            </div>
           ) : (
-            <textarea
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              wrap="off"
-              aria-label="JPS script"
-              className="h-full w-full resize-none rounded border border-gray-700 bg-black p-4 font-mono text-white outline-none placeholder:text-gray-500 focus:border-blue-500"
-            />
+            <div className="flex h-full flex-col gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  {selectedFile && (
+                    <p className="text-sm text-gray-600">Editing {selectedFile}</p>
+                  )}
+                  {scriptSaveError
+                    ? <p className="text-sm text-red-700" role="alert">{scriptSaveError}</p>
+                    : scriptSaveMessage && <p className="text-sm text-green-700" role="status">{scriptSaveMessage}</p>}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSaveScript}
+                  disabled={!selectedFile || isSavingScript}
+                  className="rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+                  {isSavingScript ? "Saving Script..." : "Save Script"}
+                </button>
+              </div>
+              <textarea
+                value={text}
+                disabled={isSavingScript}
+                onChange={(event) => {
+                  setText(event.target.value);
+                  setScriptSaveError("");
+                  setScriptSaveMessage("");
+                }}
+                wrap="off"
+                aria-label="JPS script"
+                className="min-h-0 flex-1 resize-none rounded border border-gray-700 bg-black p-4 font-mono text-white outline-none placeholder:text-gray-500 focus:border-blue-500"
+              />
+            </div>
           )}
         </div>
       </div>
