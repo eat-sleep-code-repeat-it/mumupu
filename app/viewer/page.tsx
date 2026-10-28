@@ -210,7 +210,7 @@ export default function Home() {
       })
       .then((data) => {
         setFolders(data.folders);
-        setExpandedFolders(new Set(data.folders.map((folder) => folder.path)));
+        setExpandedFolders(new Set());
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") {
