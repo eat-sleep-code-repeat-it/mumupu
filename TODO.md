@@ -72,7 +72,7 @@
 - [x] Split slurs attached to bar lines.
 - [x] Repeat endings/jump houses using `[` and `]`, including wrapped endings and represented modifiers.
 - [x] Manual `[fenye]` page breaks with first-page-only SVG rendering.
-- [ ] True multi-page SVG output or an explicit multi-page export contract.
+- [x] True multi-page viewer display and vertically stacked SVG export using the Zhipu renderer.
 
 ## Phase 6: Accompaniment and Multi-Voice
 

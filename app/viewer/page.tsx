@@ -140,7 +140,7 @@ function FolderTree({
 
 export default function Home() {
   const [text, setText] = useState("");
-  const [svg, setSvg] = useState("");
+  const [svgs, setSvgs] = useState<string[]>([]);
   const [folders, setFolders] = useState<JpsFolder[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [fileFilter, setFileFilter] = useState("");
@@ -157,8 +157,8 @@ export default function Home() {
   const fileRequestRef = useRef<AbortController | null>(null);
   const selectedFileRenderGenerationRef = useRef(0);
 
-  async function renderSvg(script: string, signal?: AbortSignal): Promise<string> {
-    const response = await fetch("/api/translate", {
+  async function renderScore(script: string, signal?: AbortSignal): Promise<{ pages: string[]; exportSvg: string }> {
+    const response = await fetch("/api/jianpu", {
       method: "POST",
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
@@ -171,8 +171,14 @@ export default function Home() {
       throw new Error(`Request failed: ${response.status}`);
     }
 
-    const data = await response.json();
-    return data.svg;
+    const data = await response.json() as { pages?: unknown; exportSvg?: unknown };
+    if (!Array.isArray(data.pages) || data.pages.length === 0 || !data.pages.every((page) => typeof page === "string")) {
+      throw new Error("Renderer returned an invalid page list");
+    }
+    if (typeof data.exportSvg !== "string") {
+      throw new Error("Renderer returned an invalid SVG export");
+    }
+    return { pages: data.pages, exportSvg: data.exportSvg };
   }
 
   useEffect(() => {
@@ -223,9 +229,9 @@ export default function Home() {
     const renderGeneration = selectedFileRenderGenerationRef.current;
     const controller = new AbortController();
     const timeout = window.setTimeout(() => {
-      renderSvg(text, controller.signal)
-        .then((nextSvg) => {
-          setSvg(nextSvg);
+      renderScore(text, controller.signal)
+        .then(({ pages }) => {
+          setSvgs(pages);
           setRenderError("");
           if (renderGeneration === selectedFileRenderGenerationRef.current) {
             setIsRenderingSelectedFile(false);
@@ -251,8 +257,8 @@ export default function Home() {
 
   async function handlePreview() {
     try {
-      const nextSvg = await renderSvg(text);
-      setSvg(nextSvg);
+      const { pages } = await renderScore(text);
+      setSvgs(pages);
       setRenderError("");
       setPreview(true);
       setMode("preview");
@@ -283,9 +289,9 @@ export default function Home() {
             ],
           })
         : null;
-      const svgToSave = await renderSvg(text);
-      setSvg(svgToSave);
-      const blob = new Blob([svgToSave], { type: "image/svg+xml;charset=utf-8" });
+      const { pages, exportSvg } = await renderScore(text);
+      setSvgs(pages);
+      const blob = new Blob([exportSvg], { type: "image/svg+xml;charset=utf-8" });
 
       if (fileHandle) {
         const writable = await fileHandle.createWritable();
@@ -514,10 +520,18 @@ export default function Home() {
                 {renderError}
               </div>
             ) : (
-              <div
-                className="h-full w-full overflow-auto bg-white"
-                dangerouslySetInnerHTML={{ __html: svg }}
-              />
+              <div className="h-full w-full overflow-auto bg-gray-100 p-4">
+                <div className="mx-auto max-w-[1000px]">
+                  {svgs.map((page, index) => (
+                    <div
+                      key={index}
+                      aria-label={`Score page ${index + 1}`}
+                      className="mb-4 bg-white shadow [&_svg]:block [&_svg]:h-auto [&_svg]:w-full"
+                      dangerouslySetInnerHTML={{ __html: page }}
+                    />
+                  ))}
+                </div>
+              </div>
             )
           ) : (
             <textarea

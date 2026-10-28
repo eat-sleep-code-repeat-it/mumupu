@@ -1,3 +1,5 @@
+import { combineSvgPages, splitJianpuSvgPages } from "@/lib/svg-pages";
+
 const DEFAULT_PAGE_CONFIG = {
   biaoti_font: "Microsoft YaHei",
   biaoti_size: "36",
@@ -44,10 +46,7 @@ export async function POST(request: Request) {
   }
 
   const text = await response.text();
-  const pages = text
-    .split("[fenye]")
-    .map((page) => page.replace(/\r/g, ""))
-    .filter((page) => page.trim().length > 0);
+  const pages = splitJianpuSvgPages(text);
 
   if (pages.length === 0) {
     return Response.json(
@@ -56,6 +55,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const svg = pages[0].replace(/&/g, "+");
-  return Response.json({ svg });
+  const svg = pages[0];
+  const exportSvg = combineSvgPages(pages);
+  return Response.json({ svg, pages, exportSvg });
 }
