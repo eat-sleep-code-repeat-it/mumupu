@@ -146,6 +146,7 @@ export interface JpsEvent {
   upperMordent?: boolean;
   sustainedOrnament?: "cy" | "yc" | "tr";
   specialBarMarker?: "hs" | "ds";
+  barAnnotation?: "fine" | "dc";
   graceNotes?: JpsGraceNote[];
   jumpHouseStartLabel?: string;
   jumpHouseEnd?: boolean;
@@ -452,6 +453,18 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
     const beforePreviousEvent = events[eventIndex - 2];
     const afterNextEvent = events[eventIndex + 2];
     const thirdNextEvent = events[eventIndex + 3];
+    const isShiftedDottedFlatSevenFifthAtBar = event.pitch === "5"
+      && event.durationMark === "/"
+      && !event.slurEndCount
+      && previousEvent?.pitch === "7"
+      && previousEvent.accidental.includes("$")
+      && previousEvent.octave === 0
+      && beforePreviousEvent?.pitch === "7"
+      && beforePreviousEvent.accidental.includes("$")
+      && events[eventIndex - 3]?.pitch === null
+      && events[eventIndex - 3]?.durationMark === "/"
+      && events[eventIndex - 4]?.pitch === "2"
+      && events[eventIndex - 4]?.durationMark.includes(".");
     if (usesGraceNotation) {
       if (event.durationMark.includes("//") || event.durationMark.includes("./")) {
         width += 0.5;
@@ -1926,7 +1939,13 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
         && event.durationMark.includes("/")
         && (
           (preserveRichBeatSpacing && event.octave > 0)
-          || (event.pitch === "7" && event.accidental.includes("$") && !event.slurEndCount)
+          || (
+            event.pitch === "7"
+            && event.accidental.includes("$")
+            && !event.slurEndCount
+            // The bar itself covers a low-octave flat's clearance in this position.
+            && !(event.octave < 0 && nextEvent?.type === "bar")
+          )
           || (event.pitch === "6" && event.accidental.includes("$") && !nextEvent.annotation && !endsRestoredFlatTail)
         )
       ) {
@@ -1953,6 +1972,8 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
         && !event.accidental
         && event.octave === 0
         && ["4", "5"].includes(event.pitch ?? "")
+        // The dotted-rest repeated-flat figure owns this shifted-beat space already.
+        && !isShiftedDottedFlatSevenFifthAtBar
       ) {
         width += 0.4;
       }
@@ -2172,6 +2193,60 @@ function naturalEventAdvances(events: JpsEvent[], preserveRichBeatSpacing = fals
       && nextEvent.accidental.includes("$");
     if (isRestAfterDottedShiftedBeat) {
       width += 1;
+    }
+    // Rich spacing on manual-break rows distinguishes these bar-ending phrases by local
+    // pitch and slur context; the cross-bar guard keeps the similar carried slur unchanged.
+    if (
+      preserveRichBeatSpacing
+      && nextEvent?.type === "bar"
+      && event.pitch === "6"
+      && event.octave < 0
+      && event.durationMark === "/"
+      && event.slurEndCount
+      && previousEvent?.pitch === "4"
+      && previousEvent.accidental.includes("#")
+    ) {
+      width += 0.4;
+    }
+    if (
+      preserveRichBeatSpacing
+      && nextEvent?.type === "bar"
+      && event.pitch === "5"
+      && event.octave === 0
+      && event.durationMark === "/"
+      && event.slurEndCount
+      && !previousEvent?.accidental
+      && previousEvent?.pitch === "4"
+    ) {
+      width -= 0.4;
+    }
+    if (
+      preserveRichBeatSpacing
+      && nextEvent?.type === "bar"
+      && event.pitch === "1"
+      && event.octave > 0
+      && event.durationMark === "/"
+      && event.slurEndCount
+      && previousEvent?.pitch === "7"
+      && previousEvent.accidental.includes("$")
+      && crossBarSlurCount === 0
+    ) {
+      width += 0.4;
+    }
+    if (
+      preserveRichBeatSpacing
+      && nextEvent?.type === "bar"
+      && event.pitch === "6"
+      && event.octave < 0
+      && event.durationMark === "/"
+      && event.slurEndCount
+      && previousEvent?.pitch === "7"
+      && previousEvent.accidental.includes("$")
+      && previousEvent.octave < 0
+      && previousEvent.durationMark === "/"
+      && !previousEvent.slurStartCount
+    ) {
+      width += 0.4;
     }
     return width;
   });
@@ -2482,6 +2557,14 @@ export function parseJpsEvents(input: string): JpsEvent[] {
         eventIndex += 1;
         tokenIndex += 1;
         continue;
+      }
+      if (token === "&fine" || token === "&dc") {
+        const previousBar = events.at(-1);
+        if (previousBar?.type === "bar" && previousBar.lineIndex === lineIndex) {
+          previousBar.barAnnotation = token === "&fine" ? "fine" : "dc";
+          previousBar.code += `+${previousBar.barAnnotation}`;
+          continue;
+        }
       }
       if (token === ":") {
         const previousBar = events.at(-1);
@@ -3034,40 +3117,64 @@ function parseJpsNoteToken(token: string, x: number, y: number): JpsNote {
 }
 
 function lyricUnits(content: string): string[] {
-  const withoutAnnotation = content.replace(/^"[^"]*"\s*/, "");
   const units: string[] = [];
 
-  for (const token of withoutAnnotation.split(/\s+/).filter(Boolean)) {
-    for (const word of token.split("/").filter(Boolean)) {
-      let current = "";
-      let joinNext = false;
-
-      for (const character of Array.from(word)) {
-        if (character === "@") {
-          if (current.length > 0) {
-            units.push(current.replace(/_/g, " "));
-            current = "";
-          }
-          units.push("");
-          continue;
-        }
-
-        if (character === "~") {
-          joinNext = true;
-          continue;
-        }
-
-        if (current.length > 0 && !joinNext) {
-          units.push(current.replace(/_/g, " "));
-          current = "";
-        }
-
-        current += character;
-        joinNext = false;
+  for (const token of content.split(/\s+/).filter(Boolean)) {
+    for (const part of token.matchAll(/"([^"]*)"|([^"]+)/g)) {
+      if (part[1] !== undefined) {
+        units.push(part[1].replace(/_/g, " "));
+        continue;
       }
 
-      if (current.length > 0) {
-        units.push(current.replace(/_/g, " "));
+      const text = part[2];
+      if (!text) continue;
+
+      for (const word of text.split("/").filter(Boolean)) {
+        for (const segment of word.split(/(@)/)) {
+          if (!segment) continue;
+          if (segment === "@") {
+            units.push("");
+            continue;
+          }
+
+          const englishWord = segment.match(/^([A-Za-z]+(?:['’-][A-Za-z]+)*)([,.;:!?]?)$/);
+          if (englishWord) {
+            units.push(englishWord[1]);
+            if (englishWord[2]) units.push(englishWord[2]);
+            continue;
+          }
+
+          let current = "";
+          let joinNext = false;
+
+          for (const character of Array.from(segment)) {
+            if (character === "@") {
+              if (current.length > 0) {
+                units.push(current.replace(/_/g, " "));
+                current = "";
+              }
+              units.push("");
+              continue;
+            }
+
+            if (character === "~") {
+              joinNext = true;
+              continue;
+            }
+
+            if (current.length > 0 && !joinNext) {
+              units.push(current.replace(/_/g, " "));
+              current = "";
+            }
+
+            current += character;
+            joinNext = false;
+          }
+
+          if (current.length > 0) {
+            units.push(current.replace(/_/g, " "));
+          }
+        }
       }
     }
   }
@@ -3158,7 +3265,9 @@ export function renderJpsToSvg(input: string): string {
     svgChildren.push(svgUse(key.accidental ? 125 : 120, 176, `diaohao_zimu_${key.letter}`, ` code="${escapeXmlAttribute(parsed.header.D)}" data-diaohao="true"`));
   }
 
-  const timeSignatures = (parsed.header.P ?? "").split(",").map((value) => value.trim()).filter(Boolean);
+  const timeSignatures = (parsed.header.P ?? "").match(/\d+\s*\/\s*\d+/g)
+    ?.map((signature) => signature.replace(/\s/g, ""))
+    ?? [];
   const timeSignatureKeyOffset = timeSignatures.length === 1
     && parsed.header.D
     && keySignatureParts(parsed.header.D).accidental
@@ -3579,6 +3688,10 @@ export function renderJpsToSvg(input: string): string {
           }
           const numericBarX = typeof barXValue === "string" ? Number(barXValue) : barXValue;
           lastBarX = numericBarX;
+          if (event.barAnnotation) {
+            const label = event.barAnnotation === "fine" ? "Fine" : "D.C.";
+            markingChildren.push(`<text x="${formatSvgNumber(numericBarX + 5)}" y="${formatSvgNumber(rowY + 22)}" text-anchor="middle" fill="#303030" font-size="10" font-style="italic" font-family="serif" data-bar-annotation="${event.barAnnotation}" >${label}</text>`);
+          }
           if (event.jumpHouseEnd && activeJumpHouse) {
             const endX = numericBarX - 2;
             const topY = rowY - 30;
@@ -4442,6 +4555,16 @@ const ORACLE_ULP_DRIFT = new Map<number, string>([
   [398.69668246445490922, "398.69668246446"],
   [399.69668246445490922, "399.69668246446"],
   [404.69668246445490922, "404.69668246446"],
+  [515.8454090150251, "515.84540901502"],
+  [592.95826377295509, "592.95826377295"],
+  [595.95826377295509, "595.95826377295"],
+  [601.95826377295509, "601.95826377295"],
+  [688.92510121457508, "688.92510121457"],
+  [700.08158508158499, "700.08158508159"],
+  [725.98834498834492, "725.98834498835"],
+  [731.98834498834492, "731.98834498835"],
+  [764.34042553191489, "764.34042553192"],
+  [770.34042553191489, "770.34042553192"],
 ]);
 
 function formatSvgNumber(value: number): string {
