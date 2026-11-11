@@ -147,9 +147,10 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileError, setFileError] = useState("");
   const [renderError, setRenderError] = useState("");
-  const [scriptSaveError, setScriptSaveError] = useState("");
-  const [scriptSaveMessage, setScriptSaveMessage] = useState("");
-  const [isSavingScript, setIsSavingScript] = useState(false);
+  const [semitoneShift, setSemitoneShift] = useState("0");
+  const [transposeError, setTransposeError] = useState("");
+  const [transposeMessage, setTransposeMessage] = useState("");
+  const [isTransposing, setIsTransposing] = useState(false);
   const [isRenderingSelectedFile, setIsRenderingSelectedFile] = useState(false);
   const [renderRevision, setRenderRevision] = useState(0);
   const [preview, setPreview] = useState(true);
@@ -318,32 +319,52 @@ export default function Home() {
     }
   }
 
-  async function handleSaveScript() {
-    if (!selectedFile || isSavingScript) {
+  async function handleTranspose() {
+    const adjustment = Number(semitoneShift);
+    if (!Number.isInteger(adjustment)) {
+      setTransposeError("Please enter an integer transpose value, for example -1 or 1.");
       return;
     }
 
-    setIsSavingScript(true);
-    setScriptSaveError("");
-    setScriptSaveMessage("");
+    const renderGeneration = selectedFileRenderGenerationRef.current;
+    setIsTransposing(true);
+    setTransposeError("");
+    setTransposeMessage("");
+
     try {
-      const response = await fetch("/api/songs/save", {
-        method: "PUT",
+      const response = await fetch("/api/transpose", {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ path: selectedFile, content: text }),
+        body: JSON.stringify({ script: text, adjustment }),
       });
+
+      const data = await response.json() as { script?: unknown; error?: unknown };
       if (!response.ok) {
-        const data = await response.json() as { error?: unknown };
-        throw new Error(typeof data.error === "string" ? data.error : `Request failed: ${response.status}`);
+        throw new Error(
+          typeof data.error === "string" ? data.error : `Request failed: ${response.status}`,
+        );
       }
-      setScriptSaveMessage(`Saved changes to ${selectedFile}.`);
+      if (typeof data.script !== "string") {
+        throw new Error("Transpose returned an invalid script.");
+      }
+      if (renderGeneration !== selectedFileRenderGenerationRef.current) {
+        return;
+      }
+
+      setText(data.script);
+      setTransposeMessage(`Transposed script by ${adjustment} semitone${Math.abs(adjustment) === 1 ? "" : "s"}.`);
     } catch (error) {
-      console.error("Script save failed:", error);
-      setScriptSaveError(error instanceof Error ? error.message : "Could not save script.");
+      if (renderGeneration !== selectedFileRenderGenerationRef.current) {
+        return;
+      }
+      console.error("Transpose failed:", error);
+      setTransposeError(
+        error instanceof Error ? error.message : "Transpose failed. Please try again.",
+      );
     } finally {
-      setIsSavingScript(false);
+      setIsTransposing(false);
     }
   }
 
@@ -354,8 +375,8 @@ export default function Home() {
     selectedFileRenderGenerationRef.current += 1;
     setFileError("");
     setRenderError("");
-    setScriptSaveError("");
-    setScriptSaveMessage("");
+    setTransposeMessage("");
+    setTransposeError("");
     setIsRenderingSelectedFile(true);
     setPreview(true);
     setMode("preview");
@@ -370,6 +391,7 @@ export default function Home() {
 
       const content = await response.text();
       setText(content);
+      setSemitoneShift("0");
       setRenderRevision((current) => current + 1);
       setSelectedFile(file.path);
     } catch (error) {
@@ -467,31 +489,11 @@ export default function Home() {
   const normalizedFilter = fileFilter.trim().toLocaleLowerCase();
   const visibleFolders = filterFolders(folders, normalizedFilter);
   const visibleFileCount = countFiles(visibleFolders);
+  const isValidSemitoneShift =
+    semitoneShift.trim() !== "" && Number.isInteger(Number(semitoneShift));
 
   return (
     <main className="flex h-screen flex-col">
-      {/* Navigation */}
-      <nav className="flex h-14 items-center gap-2 border-b bg-gray-100 px-4">
-        <button
-          type="button"
-          onClick={() => setIsSidebarVisible((visible) => !visible)}
-          aria-expanded={isSidebarVisible}
-          aria-controls="viewer-file-panel"
-          className={buttonClass(isSidebarVisible)}>
-          {isSidebarVisible ? "Hide files" : "Show files"}
-        </button>
-        <button 
-          onClick={handleScript}
-          className={buttonClass(mode === "script")}>
-          Script
-        </button>
-        <button 
-          onClick={handlePreview}
-          className={buttonClass(mode === "preview")}>
-          Preview
-        </button>
-      </nav>
-
       <div className="flex min-h-0 flex-1">
         {isSidebarVisible && (
           <>
@@ -544,17 +546,76 @@ export default function Home() {
           </>
         )}
 
-        <div className="min-w-0 flex-1 p-4">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col p-4">
+          <div className="mb-2 flex min-w-0 items-center justify-between gap-2 overflow-x-auto">
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsSidebarVisible((visible) => !visible)}
+                aria-expanded={isSidebarVisible}
+                aria-controls="viewer-file-panel"
+                className={`${buttonClass(isSidebarVisible)} whitespace-nowrap`}>
+                {isSidebarVisible ? "Hide files" : "Show files"}
+              </button>
+              <button
+                type="button"
+                onClick={handleScript}
+                className={`${buttonClass(mode === "script")} whitespace-nowrap`}>
+                Script
+              </button>
+              <button
+                type="button"
+                onClick={handlePreview}
+                className={`${buttonClass(mode === "preview")} whitespace-nowrap`}>
+                Preview
+              </button>
+              {!preview && (
+                <>
+                  <label className="flex shrink-0 items-center gap-2 whitespace-nowrap text-sm text-gray-700">
+                    <span>Semitone shift</span>
+                    <input
+                      type="number"
+                      value={semitoneShift}
+                      aria-label="Semitone shift"
+                      onChange={(event) => {
+                        setSemitoneShift(event.target.value);
+                        setTransposeError("");
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && isValidSemitoneShift && !isTransposing) {
+                          void handleTranspose();
+                        }
+                      }}
+                      className="w-20 rounded border border-gray-300 px-2 py-1"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void handleTranspose()}
+                    disabled={!isValidSemitoneShift || isTransposing}
+                    className="shrink-0 whitespace-nowrap rounded bg-gray-200 px-3 py-1 text-black hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-60">
+                    {isTransposing ? "Transposing..." : "Transpose"}
+                  </button>
+                </>
+              )}
+            </div>
+            {preview && (
+              <button
+                type="button"
+                onClick={handleSave}
+                className="shrink-0 whitespace-nowrap rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700">
+                Save SVG
+              </button>
+            )}
+          </div>
+          {transposeError && (
+            <p className="mb-2 text-sm text-red-700" role="alert">{transposeError}</p>
+          )}
+          {transposeMessage && !preview && (
+            <p className="mb-2 text-sm text-green-700" role="status">{transposeMessage}</p>
+          )}
           {preview ? (
-            <div className="flex h-full flex-col gap-2">
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  className="rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700">
-                  Save SVG
-                </button>
-              </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-2">
               <div className="min-h-0 flex-1">
                 {isRenderingSelectedFile ? (
                   <div
@@ -589,31 +650,19 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            <div className="flex h-full flex-col gap-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  {selectedFile && (
-                    <p className="text-sm text-gray-600">Editing {selectedFile}</p>
-                  )}
-                  {scriptSaveError
-                    ? <p className="text-sm text-red-700" role="alert">{scriptSaveError}</p>
-                    : scriptSaveMessage && <p className="text-sm text-green-700" role="status">{scriptSaveMessage}</p>}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleSaveScript}
-                  disabled
-                  className="rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
-                  Save Script
-                </button>
+            <div className="flex min-h-0 flex-1 flex-col gap-2">
+              <div>
+                {selectedFile && (
+                  <p className="text-sm text-gray-600">Editing {selectedFile}</p>
+                )}
               </div>
               <textarea
                 value={text}
-                disabled={isSavingScript}
+                disabled={isTransposing}
                 onChange={(event) => {
                   setText(event.target.value);
-                  setScriptSaveError("");
-                  setScriptSaveMessage("");
+                  setTransposeMessage("");
+                  setTransposeError("");
                 }}
                 wrap="off"
                 aria-label="JPS script"
