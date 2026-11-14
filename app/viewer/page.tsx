@@ -3,10 +3,12 @@
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
   useEffect,
   useRef,
   useState,
 } from "react";
+import { checkAccidentalRules, type AccidentalRuleViolation } from "@/lib/accidental-rules";
 
 type JpsFile = {
   name: string;
@@ -68,6 +70,37 @@ function folderPaths(folders: JpsFolder[]): string[] {
 
 function publicFileUrl(filePath: string): string {
   return `/${filePath.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+function renderHighlightedScript(text: string, violations: AccidentalRuleViolation[]): ReactNode {
+  if (violations.length === 0) {
+    return text;
+  }
+
+  const parts: ReactNode[] = [];
+  let cursor = 0;
+
+  violations.forEach((violation, index) => {
+    if (violation.start > cursor) {
+      parts.push(text.slice(cursor, violation.start));
+    }
+    parts.push(
+      <mark
+        key={`${violation.start}-${index}`}
+        title={`Prior sharp or flat carries to this note; add "=" if it should be natural (line ${violation.line}).`}
+        className="rounded-sm bg-amber-300 text-black underline decoration-red-700 decoration-2 underline-offset-2"
+      >
+        {text.slice(violation.start, violation.end)}
+      </mark>,
+    );
+    cursor = violation.end;
+  });
+
+  if (cursor < text.length) {
+    parts.push(text.slice(cursor));
+  }
+
+  return parts;
 }
 
 type FolderTreeProps = {
@@ -150,6 +183,7 @@ export default function Home() {
   const [semitoneShift, setSemitoneShift] = useState("0");
   const [transposeError, setTransposeError] = useState("");
   const [transposeMessage, setTransposeMessage] = useState("");
+  const [accidentalRuleViolations, setAccidentalRuleViolations] = useState<AccidentalRuleViolation[] | null>(null);
   const [isTransposing, setIsTransposing] = useState(false);
   const [isRenderingSelectedFile, setIsRenderingSelectedFile] = useState(false);
   const [renderRevision, setRenderRevision] = useState(0);
@@ -158,6 +192,8 @@ export default function Home() {
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState<number | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
+  const scriptEditorRef = useRef<HTMLTextAreaElement | null>(null);
+  const scriptHighlightRef = useRef<HTMLPreElement | null>(null);
   const resizeCleanupRef = useRef<(() => void) | null>(null);
   const fileRequestRef = useRef<AbortController | null>(null);
   const selectedFileRenderGenerationRef = useRef(0);
@@ -225,6 +261,15 @@ export default function Home() {
   }, []);
 
   useEffect(() => () => resizeCleanupRef.current?.(), []);
+
+  useEffect(() => {
+    const editor = scriptEditorRef.current;
+    const highlight = scriptHighlightRef.current;
+    if (editor && highlight) {
+      highlight.scrollTop = editor.scrollTop;
+      highlight.scrollLeft = editor.scrollLeft;
+    }
+  }, [accidentalRuleViolations]);
 
   useEffect(() => {
     if (!text) {
@@ -330,6 +375,7 @@ export default function Home() {
     setIsTransposing(true);
     setTransposeError("");
     setTransposeMessage("");
+    setAccidentalRuleViolations(null);
 
     try {
       const response = await fetch("/api/transpose", {
@@ -354,6 +400,7 @@ export default function Home() {
       }
 
       setText(data.script);
+      setAccidentalRuleViolations(null);
       setTransposeMessage(`Transposed script by ${adjustment} semitone${Math.abs(adjustment) === 1 ? "" : "s"}.`);
     } catch (error) {
       if (renderGeneration !== selectedFileRenderGenerationRef.current) {
@@ -377,6 +424,7 @@ export default function Home() {
     setRenderError("");
     setTransposeMessage("");
     setTransposeError("");
+    setAccidentalRuleViolations(null);
     setIsRenderingSelectedFile(true);
     setPreview(true);
     setMode("preview");
@@ -409,6 +457,19 @@ export default function Home() {
   function handleScript() {
     setPreview(false);
     setMode("script");
+  }
+
+  function handleCheckAccidentalRules() {
+    setAccidentalRuleViolations(checkAccidentalRules(text));
+  }
+
+  function handleScriptEditorScroll() {
+    const editor = scriptEditorRef.current;
+    const highlight = scriptHighlightRef.current;
+    if (editor && highlight) {
+      highlight.scrollTop = editor.scrollTop;
+      highlight.scrollLeft = editor.scrollLeft;
+    }
   }
 
   function handleToggleFolder(folderPath: string) {
@@ -596,6 +657,12 @@ export default function Home() {
                     className="shrink-0 whitespace-nowrap rounded bg-gray-200 px-3 py-1 text-black hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-60">
                     {isTransposing ? "Transposing..." : "Transpose"}
                   </button>
+                  <button
+                    type="button"
+                    onClick={handleCheckAccidentalRules}
+                    className="shrink-0 whitespace-nowrap rounded bg-gray-200 px-3 py-1 text-black hover:bg-gray-300">
+                    Check rules
+                  </button>
                 </>
               )}
             </div>
@@ -613,6 +680,13 @@ export default function Home() {
           )}
           {transposeMessage && !preview && (
             <p className="mb-2 text-sm text-green-700" role="status">{transposeMessage}</p>
+          )}
+          {accidentalRuleViolations && !preview && (
+            <p className="mb-2 text-sm text-amber-800" role="status">
+              {accidentalRuleViolations.length === 0
+                ? "No potential missing natural signs found."
+                : `Found ${accidentalRuleViolations.length} possible missing natural sign${accidentalRuleViolations.length === 1 ? "" : "s"}. Add "=" where a highlighted note should be natural.`}
+            </p>
           )}
           {preview ? (
             <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -656,18 +730,30 @@ export default function Home() {
                   <p className="text-sm text-gray-600">Editing {selectedFile}</p>
                 )}
               </div>
-              <textarea
-                value={text}
-                disabled={isTransposing}
-                onChange={(event) => {
-                  setText(event.target.value);
-                  setTransposeMessage("");
-                  setTransposeError("");
-                }}
-                wrap="off"
-                aria-label="JPS script"
-                className="min-h-0 flex-1 resize-none rounded border border-gray-700 bg-black p-4 font-mono text-white outline-none placeholder:text-gray-500 focus:border-blue-500"
-              />
+              <div className="relative min-h-0 flex-1 overflow-hidden rounded border border-gray-700 bg-black focus-within:border-blue-500">
+                <pre
+                  ref={scriptHighlightRef}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 m-0 overflow-hidden whitespace-pre p-4 font-mono text-base leading-6 text-white"
+                >
+                  {renderHighlightedScript(text, accidentalRuleViolations ?? [])}
+                </pre>
+                <textarea
+                  ref={scriptEditorRef}
+                  value={text}
+                  disabled={isTransposing}
+                  onChange={(event) => {
+                    setText(event.target.value);
+                    setTransposeMessage("");
+                    setTransposeError("");
+                    setAccidentalRuleViolations(null);
+                  }}
+                  onScroll={handleScriptEditorScroll}
+                  wrap="off"
+                  aria-label="JPS script"
+                  className="absolute inset-0 h-full w-full resize-none overflow-auto rounded bg-transparent p-4 font-mono text-base leading-6 text-transparent caret-white outline-none placeholder:text-gray-500 selection:bg-blue-500/50 focus:border-blue-500"
+                />
+              </div>
             </div>
           )}
         </div>

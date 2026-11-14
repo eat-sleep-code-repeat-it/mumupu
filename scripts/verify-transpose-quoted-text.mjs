@@ -16,4 +16,15 @@ assert.deepEqual(
 assert.match(script, /"p:4\/4"/, "the fixture should exercise the reported quoted time signature");
 assert.notEqual(transposed, script, "notes outside quoted text should still transpose");
 
+assert.equal(
+  transposeScriptByAdjustment("Q:|1# 1 1= 1|1|", 1),
+  "Q:|221#1#|1#|",
+  "transpose should carry accidentals within a measure, honor natural signs, and reset at bars",
+);
+assert.equal(
+  transposeScriptByAdjustment("Q:|7,#|", 1),
+  transposeScriptByAdjustment("Q:|7#,|", 1),
+  "alternate sharp/comma orderings should transpose identically",
+);
+
 console.log("Verified quoted text remains unchanged during transposition.");

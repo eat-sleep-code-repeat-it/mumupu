@@ -53,6 +53,14 @@ The spec defines a large set of symbols for the notation system:
 - `&...` encodes many special symbols, such as accompaniment brackets or notation marks
 - Dynamic markings like `&mp`, `<...!`, and `>` are supported
 
+Accidentals apply to later occurrences of the same numbered pitch in the same octave within a measure. Use `=` to restore the natural pitch; a barline resets the accidental state.
+
+## Accidental checking and transposition
+
+In the viewer's Script panel, **Check rules** highlights an unmarked occurrence of a pitch that follows a sharp or flat on that pitch in the same measure. This is a potential missing natural, not a definitive error: an unmarked note inherits the active accidental and may be intended to remain sharp or flat. Add `=` when the note should be natural.
+
+Semitone transposition honors active accidentals through each measure. Its output repeats sharp or flat signs explicitly and writes `=` when a natural note must cancel an accidental already active on that pitch.
+
 ## Lyrics
 
 Lyrics are represented with `C:` lines and are matched to the preceding melody line. The spec covers:
