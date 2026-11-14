@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { checkAccidentalRules, type AccidentalRuleViolation } from "@/lib/accidental-rules";
+import { checkScriptRules, type ScriptRuleIssue } from "@/lib/accidental-rules";
 
 type JpsFile = {
   name: string;
@@ -72,28 +72,28 @@ function publicFileUrl(filePath: string): string {
   return `/${filePath.split("/").map(encodeURIComponent).join("/")}`;
 }
 
-function renderHighlightedScript(text: string, violations: AccidentalRuleViolation[]): ReactNode {
-  if (violations.length === 0) {
+function renderHighlightedScript(text: string, issues: ScriptRuleIssue[]): ReactNode {
+  if (issues.length === 0) {
     return text;
   }
 
   const parts: ReactNode[] = [];
   let cursor = 0;
 
-  violations.forEach((violation, index) => {
-    if (violation.start > cursor) {
-      parts.push(text.slice(cursor, violation.start));
+  issues.forEach((issue, index) => {
+    if (issue.start > cursor) {
+      parts.push(text.slice(cursor, issue.start));
     }
     parts.push(
       <mark
-        key={`${violation.start}-${index}`}
-        title={`Prior sharp or flat carries to this note; add "=" if it should be natural (line ${violation.line}).`}
+        key={`${issue.start}-${index}`}
+        title={issue.message}
         className="rounded-sm bg-amber-300 text-black underline decoration-red-700 decoration-2 underline-offset-2"
       >
-        {text.slice(violation.start, violation.end)}
+        {text.slice(issue.start, issue.end)}
       </mark>,
     );
-    cursor = violation.end;
+    cursor = issue.end;
   });
 
   if (cursor < text.length) {
@@ -101,6 +101,19 @@ function renderHighlightedScript(text: string, violations: AccidentalRuleViolati
   }
 
   return parts;
+}
+
+function summarizeRuleIssues(issues: ScriptRuleIssue[]): string {
+  const summaries = [
+    ["accidental", "possible missing natural sign"],
+    ["bracket", "bracket pairing issue"],
+    ["quote", "unpaired double quote"],
+  ].flatMap(([kind, label]) => {
+    const count = issues.filter((issue) => issue.kind === kind).length;
+    return count > 0 ? [`${count} ${label}${count === 1 ? "" : "s"}`] : [];
+  });
+
+  return `Found ${summaries.join(", ")}. Review the highlighted locations.`;
 }
 
 type FolderTreeProps = {
@@ -183,7 +196,7 @@ export default function Home() {
   const [semitoneShift, setSemitoneShift] = useState("0");
   const [transposeError, setTransposeError] = useState("");
   const [transposeMessage, setTransposeMessage] = useState("");
-  const [accidentalRuleViolations, setAccidentalRuleViolations] = useState<AccidentalRuleViolation[] | null>(null);
+  const [ruleCheckIssues, setRuleCheckIssues] = useState<ScriptRuleIssue[] | null>(null);
   const [isTransposing, setIsTransposing] = useState(false);
   const [isRenderingSelectedFile, setIsRenderingSelectedFile] = useState(false);
   const [renderRevision, setRenderRevision] = useState(0);
@@ -269,7 +282,7 @@ export default function Home() {
       highlight.scrollTop = editor.scrollTop;
       highlight.scrollLeft = editor.scrollLeft;
     }
-  }, [accidentalRuleViolations]);
+  }, [ruleCheckIssues]);
 
   useEffect(() => {
     if (!text) {
@@ -375,7 +388,7 @@ export default function Home() {
     setIsTransposing(true);
     setTransposeError("");
     setTransposeMessage("");
-    setAccidentalRuleViolations(null);
+    setRuleCheckIssues(null);
 
     try {
       const response = await fetch("/api/transpose", {
@@ -400,7 +413,7 @@ export default function Home() {
       }
 
       setText(data.script);
-      setAccidentalRuleViolations(null);
+      setRuleCheckIssues(null);
       setTransposeMessage(`Transposed script by ${adjustment} semitone${Math.abs(adjustment) === 1 ? "" : "s"}.`);
     } catch (error) {
       if (renderGeneration !== selectedFileRenderGenerationRef.current) {
@@ -424,7 +437,7 @@ export default function Home() {
     setRenderError("");
     setTransposeMessage("");
     setTransposeError("");
-    setAccidentalRuleViolations(null);
+    setRuleCheckIssues(null);
     setIsRenderingSelectedFile(true);
     setPreview(true);
     setMode("preview");
@@ -459,8 +472,8 @@ export default function Home() {
     setMode("script");
   }
 
-  function handleCheckAccidentalRules() {
-    setAccidentalRuleViolations(checkAccidentalRules(text));
+  function handleCheckRules() {
+    setRuleCheckIssues(checkScriptRules(text));
   }
 
   function handleScriptEditorScroll() {
@@ -659,7 +672,7 @@ export default function Home() {
                   </button>
                   <button
                     type="button"
-                    onClick={handleCheckAccidentalRules}
+                    onClick={handleCheckRules}
                     className="shrink-0 whitespace-nowrap rounded bg-gray-200 px-3 py-1 text-black hover:bg-gray-300">
                     Check rules
                   </button>
@@ -681,11 +694,11 @@ export default function Home() {
           {transposeMessage && !preview && (
             <p className="mb-2 text-sm text-green-700" role="status">{transposeMessage}</p>
           )}
-          {accidentalRuleViolations && !preview && (
+          {ruleCheckIssues && !preview && (
             <p className="mb-2 text-sm text-amber-800" role="status">
-              {accidentalRuleViolations.length === 0
-                ? "No potential missing natural signs found."
-                : `Found ${accidentalRuleViolations.length} possible missing natural sign${accidentalRuleViolations.length === 1 ? "" : "s"}. Add "=" where a highlighted note should be natural.`}
+              {ruleCheckIssues.length === 0
+                ? "No rule issues found."
+                : summarizeRuleIssues(ruleCheckIssues)}
             </p>
           )}
           {preview ? (
@@ -736,7 +749,7 @@ export default function Home() {
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-0 m-0 overflow-hidden whitespace-pre p-4 font-mono text-base leading-6 text-white"
                 >
-                  {renderHighlightedScript(text, accidentalRuleViolations ?? [])}
+                  {renderHighlightedScript(text, ruleCheckIssues ?? [])}
                 </pre>
                 <textarea
                   ref={scriptEditorRef}
@@ -746,7 +759,7 @@ export default function Home() {
                     setText(event.target.value);
                     setTransposeMessage("");
                     setTransposeError("");
-                    setAccidentalRuleViolations(null);
+                    setRuleCheckIssues(null);
                   }}
                   onScroll={handleScriptEditorScroll}
                   wrap="off"

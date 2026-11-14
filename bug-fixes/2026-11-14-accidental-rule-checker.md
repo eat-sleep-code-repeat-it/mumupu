@@ -5,6 +5,7 @@ Date: 2026-11-14
 ## Symptoms
 
 - The viewer did not identify notes that may need a natural sign after a sharp or flat in the same measure.
+- The viewer's rule check did not validate paired brackets or double quotes.
 - Semitone transposition treated each note as independent instead of honoring measure-local accidental carry.
 
 ## Root Cause
@@ -17,6 +18,7 @@ Date: 2026-11-14
 - Track sharp, flat, and natural state per note and octave through each measure during transposition.
 - Write repeated transposed sharps/flats explicitly, and restore naturals when the output accidental state changes.
 - Add a viewer check that highlights unmarked repetitions affected by an earlier sharp or flat and explains that `=` is needed when natural is intended.
+- Extend the check to report unmatched parentheses, square/curly brackets, and double quotes.
 
 ## Verification
 

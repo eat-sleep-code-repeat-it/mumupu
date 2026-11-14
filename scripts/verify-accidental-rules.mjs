@@ -1,32 +1,32 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const { checkAccidentalRules } = await import("../lib/accidental-rules.ts");
+const { checkScriptRules } = await import("../lib/accidental-rules.ts");
 const { transposeScriptByAdjustment } = await import("../lib/transpose-core.mjs");
 
 const invalidExample = 'Q:| 1//1#//1//1#//1/1//1#//1//1#//1/1//1#//2#//4//| 1 2 3 2 |';
-const violations = checkAccidentalRules(invalidExample);
+const violations = checkScriptRules(invalidExample);
 assert.deepEqual(
-  violations.map(({ note }) => note),
+  violations.filter(({ kind }) => kind === "accidental").map(({ text }) => text),
   ["1", "1", "1", "1", "1", "1"],
   "bare repetitions after a sharp should be highlighted until natural signs are added",
 );
 
 const correctedExample = 'Q:| 1//1#//1=//1#//1=/1=//1#//1=//1#//1=/1=//1#//2#//4//| 1 2 3 2 |';
 assert.equal(
-  checkAccidentalRules(correctedExample).length,
+  checkScriptRules(correctedExample).length,
   0,
   "explicit naturals and barline resets should satisfy the accidental rule",
 );
 
 assert.deepEqual(
-  checkAccidentalRules('Q:|1# 1= 1|1 1# "1 1"|\nB: 1# 1'),
+  checkScriptRules('Q:|1# 1= 1|1 1# "1 1"|\nB: 1# 1'),
   [],
   "natural signs, barlines, quoted text, and non-melody lines should not be flagged",
 );
 
 assert.deepEqual(
-  checkAccidentalRules("Q:|2$ 2|2|").map(({ note }) => note),
+  checkScriptRules("Q:|2$ 2|2|").filter(({ kind }) => kind === "accidental").map(({ text }) => text),
   ["2"],
   "flat carry should be checked and reset at the barline",
 );
@@ -36,10 +36,39 @@ const transposeSource = await readFile(
   "utf8",
 );
 const transposedSource = transposeScriptByAdjustment(transposeSource, -4);
+const sourceIssues = checkScriptRules(transposeSource);
+const transposedIssues = checkScriptRules(transposedSource);
 assert.equal(
-  checkAccidentalRules(transposedSource).length,
+  transposedIssues.filter(({ kind }) => kind === "accidental").length,
   0,
-  "transposed notes should spell repeated alterations explicitly and pass the rule check",
+  "transposed notes should spell repeated alterations explicitly without accidental warnings",
+);
+assert.deepEqual(
+  transposedIssues.filter(({ kind }) => kind !== "accidental").map(({ kind, text }) => [kind, text]),
+  sourceIssues.filter(({ kind }) => kind !== "accidental").map(({ kind, text }) => [kind, text]),
+  "transposition should preserve bracket and quote issues",
 );
 
-console.log("Verified accidental-rule checks.");
+const balancedStructure = String.raw`Q:| (1 [2 {3} ] 4) "note ( [ { and \"quoted\"" |
+Q:(1
+Q:1)`;
+assert.equal(
+  checkScriptRules(balancedStructure).length,
+  0,
+  "paired brackets may span lines, and quoted or escaped delimiters should be ignored",
+);
+
+const unpairedStructure = 'Q:|1)|\nB: "unfinished\nC: {lyric';
+assert.deepEqual(
+  checkScriptRules(unpairedStructure).map(({ kind, text }) => [kind, text]),
+  [["bracket", ")"], ["quote", "\""], ["bracket", "{"]],
+  "unpaired closing brackets, quotes, and opening brackets should all be reported",
+);
+
+assert.deepEqual(
+  checkScriptRules("Q:|([)]|").filter(({ kind }) => kind === "bracket").map(({ text }) => text),
+  ["(", ")"],
+  "crossed bracket pairs should be reported at the mismatched close and remaining open",
+);
+
+console.log("Verified script rule checks.");
