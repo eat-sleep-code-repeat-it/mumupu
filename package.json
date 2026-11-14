@@ -10,6 +10,7 @@
     "transpose": "node scripts/transpose.mjs",
     "verify:transpose": "node scripts/verify-transpose-quoted-text.mjs",
     "verify:save-script": "node --experimental-strip-types scripts/verify-save-script.mjs",
+    "verify:png-to-jps": "node --experimental-strip-types scripts/verify-png-to-jps.mjs",
     "verify:svg-pages": "node --experimental-strip-types scripts/verify-svg-pages.mjs",
     "verify:translate": "node --experimental-strip-types scripts/verify-translate.mjs",
     "verify:songs": "node --experimental-strip-types scripts/verify-translate.mjs --songs",
@@ -18,7 +19,8 @@
   "dependencies": {
     "next": "16.2.10",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
