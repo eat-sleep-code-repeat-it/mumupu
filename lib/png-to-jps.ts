@@ -1,13 +1,15 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
+import sharp from "sharp";
 import { createWorker, PSM } from "tesseract.js";
 
 import { parseJpsEvents, translate } from "./translate.ts";
 
 export const MAX_PNG_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_PIXELS = 8_000_000;
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-const OCR_CHARACTERS = "0123456789|/-.#=,'()";
+const OCR_CHARACTERS = "01234567|/-.#=,'()";
 
 export class PngToJpsError extends Error {
   readonly status: number;
@@ -66,6 +68,24 @@ export function buildJpsFromOcr(fileName: string, ocrText: string): string {
   return script;
 }
 
+export async function preprocessPngForOcr(image: Buffer): Promise<Buffer> {
+  const { width, height } = await sharp(image).metadata();
+  if (!width || !height) {
+    throw new PngToJpsError("Could not read the PNG dimensions.", 400);
+  }
+
+  if (width * height > MAX_IMAGE_PIXELS) {
+    throw new PngToJpsError("PNG dimensions must be 8 megapixels or smaller.", 413);
+  }
+
+  return sharp(image, { limitInputPixels: MAX_IMAGE_PIXELS })
+    .resize(width * 2, height * 2, { kernel: "lanczos3" })
+    .greyscale()
+    .normalize()
+    .png()
+    .toBuffer();
+}
+
 export async function parsePngToJps(image: Buffer, fileName: string): Promise<{
   script: string;
   outputPath: string;
@@ -92,12 +112,14 @@ export async function parsePngToJps(image: Buffer, fileName: string): Promise<{
   });
 
   try {
+    const enhancedImage = await preprocessPngForOcr(image);
     await worker.setParameters({
-      tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
+      tessedit_pageseg_mode: PSM.AUTO,
       tessedit_char_whitelist: OCR_CHARACTERS,
+      user_defined_dpi: "300",
     });
 
-    const { data } = await worker.recognize(image);
+    const { data } = await worker.recognize(enhancedImage);
     const script = buildJpsFromOcr(fileName, data.text);
     const outputDirectory = path.join(
       process.cwd(),
