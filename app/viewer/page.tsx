@@ -205,6 +205,7 @@ export default function Home() {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [fileFilter, setFileFilter] = useState("");
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [lastSavedText, setLastSavedText] = useState<string | null>(null);
   const [fileError, setFileError] = useState("");
   const [renderError, setRenderError] = useState("");
   const [semitoneShift, setSemitoneShift] = useState("0");
@@ -232,6 +233,7 @@ export default function Home() {
     isLocalDevelopmentHost,
     () => false,
   );
+  const hasUnsavedEdits = selectedFile !== null && lastSavedText !== null && text !== lastSavedText;
 
   async function renderScore(script: string, signal?: AbortSignal): Promise<{ pages: string[]; exportSvg: string }> {
     const response = await fetch("/api/jianpu", {
@@ -478,6 +480,7 @@ export default function Home() {
 
       const content = await response.text();
       setText(content);
+      setLastSavedText(content);
       setSemitoneShift("0");
       setRenderRevision((current) => current + 1);
       setSelectedFile(file.path);
@@ -505,6 +508,9 @@ export default function Home() {
   async function handleSaveEdits() {
     if (!selectedFile || !canSaveEdits) {
       setSaveEditsError("Select a song file and open the viewer locally to save edits.");
+      return;
+    }
+    if (!hasUnsavedEdits || isRenderingSelectedFile || isSavingEdits) {
       return;
     }
 
@@ -540,6 +546,7 @@ export default function Home() {
         return;
       }
 
+      setLastSavedText(text);
       setSaveEditsMessage(`Saved edits to ${filePath}.`);
     } catch (error) {
       if (renderGeneration !== selectedFileRenderGenerationRef.current) {
@@ -756,7 +763,7 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={() => void handleSaveEdits()}
-                      disabled={!selectedFile || isSavingEdits}
+                      disabled={!selectedFile || !hasUnsavedEdits || isRenderingSelectedFile || isSavingEdits}
                       className="shrink-0 whitespace-nowrap rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
                       {isSavingEdits ? "Saving..." : "Save edits"}
                     </button>

@@ -61,7 +61,7 @@ In the viewer's Script panel, **Check rules** highlights an unmarked occurrence 
 
 Semitone transposition honors active accidentals through each measure. Its output repeats sharp or flat signs explicitly and writes `=` when a natural note must cancel an accidental already active on that pitch.
 
-In the viewer's Script panel, **Save edits** asks for confirmation before overwriting the selected `.jps` file. Saving is available only in local development on `localhost` or a loopback address; it is unavailable in production.
+In the viewer's Script panel, **Save edits** is enabled only for unsaved edits in local development, and asks for confirmation before overwriting the selected `.jps` file. Saving is unavailable in production.
 
 ## Lyrics
 
