@@ -7,6 +7,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { checkScriptRules, type ScriptRuleIssue } from "@/lib/accidental-rules";
 
@@ -70,6 +71,19 @@ function folderPaths(folders: JpsFolder[]): string[] {
 
 function publicFileUrl(filePath: string): string {
   return `/${filePath.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+function isLocalHostname(hostname: string): boolean {
+  const normalizedHostname = hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
+  return normalizedHostname === "localhost" || normalizedHostname === "127.0.0.1" || normalizedHostname === "::1";
+}
+
+function subscribeToHostnameChanges(): () => void {
+  return () => {};
+}
+
+function isLocalDevelopmentHost(): boolean {
+  return process.env.NODE_ENV === "development" && isLocalHostname(window.location.hostname);
 }
 
 function renderHighlightedScript(text: string, issues: ScriptRuleIssue[]): ReactNode {
@@ -197,6 +211,9 @@ export default function Home() {
   const [transposeError, setTransposeError] = useState("");
   const [transposeMessage, setTransposeMessage] = useState("");
   const [ruleCheckIssues, setRuleCheckIssues] = useState<ScriptRuleIssue[] | null>(null);
+  const [isSavingEdits, setIsSavingEdits] = useState(false);
+  const [saveEditsError, setSaveEditsError] = useState("");
+  const [saveEditsMessage, setSaveEditsMessage] = useState("");
   const [isTransposing, setIsTransposing] = useState(false);
   const [isRenderingSelectedFile, setIsRenderingSelectedFile] = useState(false);
   const [renderRevision, setRenderRevision] = useState(0);
@@ -210,6 +227,11 @@ export default function Home() {
   const resizeCleanupRef = useRef<(() => void) | null>(null);
   const fileRequestRef = useRef<AbortController | null>(null);
   const selectedFileRenderGenerationRef = useRef(0);
+  const canSaveEdits = useSyncExternalStore(
+    subscribeToHostnameChanges,
+    isLocalDevelopmentHost,
+    () => false,
+  );
 
   async function renderScore(script: string, signal?: AbortSignal): Promise<{ pages: string[]; exportSvg: string }> {
     const response = await fetch("/api/jianpu", {
@@ -389,6 +411,8 @@ export default function Home() {
     setTransposeError("");
     setTransposeMessage("");
     setRuleCheckIssues(null);
+    setSaveEditsError("");
+    setSaveEditsMessage("");
 
     try {
       const response = await fetch("/api/transpose", {
@@ -438,6 +462,8 @@ export default function Home() {
     setTransposeMessage("");
     setTransposeError("");
     setRuleCheckIssues(null);
+    setSaveEditsError("");
+    setSaveEditsMessage("");
     setIsRenderingSelectedFile(true);
     setPreview(true);
     setMode("preview");
@@ -474,6 +500,56 @@ export default function Home() {
 
   function handleCheckRules() {
     setRuleCheckIssues(checkScriptRules(text));
+  }
+
+  async function handleSaveEdits() {
+    if (!selectedFile || !canSaveEdits) {
+      setSaveEditsError("Select a song file and open the viewer locally to save edits.");
+      return;
+    }
+
+    if (!window.confirm(`Save edits to ${selectedFile}? This will overwrite the existing file.`)) {
+      return;
+    }
+
+    const filePath = selectedFile;
+    const renderGeneration = selectedFileRenderGenerationRef.current;
+    setIsSavingEdits(true);
+    setSaveEditsError("");
+    setSaveEditsMessage("");
+
+    try {
+      const response = await fetch("/api/songs/save", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ path: filePath, content: text }),
+      });
+
+      const data = await response.json() as { saved?: unknown; error?: unknown };
+      if (!response.ok) {
+        throw new Error(
+          typeof data.error === "string" ? data.error : `Request failed: ${response.status}`,
+        );
+      }
+      if (data.saved !== true) {
+        throw new Error("Save endpoint returned an invalid response.");
+      }
+      if (renderGeneration !== selectedFileRenderGenerationRef.current) {
+        return;
+      }
+
+      setSaveEditsMessage(`Saved edits to ${filePath}.`);
+    } catch (error) {
+      if (renderGeneration !== selectedFileRenderGenerationRef.current) {
+        return;
+      }
+      console.error("Save edits failed:", error);
+      setSaveEditsError(error instanceof Error ? error.message : "Could not save edits.");
+    } finally {
+      setIsSavingEdits(false);
+    }
   }
 
   function handleScriptEditorScroll() {
@@ -666,7 +742,7 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => void handleTranspose()}
-                    disabled={!isValidSemitoneShift || isTransposing}
+                    disabled={!isValidSemitoneShift || isTransposing || isSavingEdits}
                     className="shrink-0 whitespace-nowrap rounded bg-gray-200 px-3 py-1 text-black hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-60">
                     {isTransposing ? "Transposing..." : "Transpose"}
                   </button>
@@ -676,6 +752,15 @@ export default function Home() {
                     className="shrink-0 whitespace-nowrap rounded bg-gray-200 px-3 py-1 text-black hover:bg-gray-300">
                     Check rules
                   </button>
+                  {canSaveEdits && (
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveEdits()}
+                      disabled={!selectedFile || isSavingEdits}
+                      className="shrink-0 whitespace-nowrap rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
+                      {isSavingEdits ? "Saving..." : "Save edits"}
+                    </button>
+                  )}
                 </>
               )}
             </div>
@@ -693,6 +778,12 @@ export default function Home() {
           )}
           {transposeMessage && !preview && (
             <p className="mb-2 text-sm text-green-700" role="status">{transposeMessage}</p>
+          )}
+          {saveEditsError && !preview && (
+            <p className="mb-2 text-sm text-red-700" role="alert">{saveEditsError}</p>
+          )}
+          {saveEditsMessage && !preview && (
+            <p className="mb-2 text-sm text-green-700" role="status">{saveEditsMessage}</p>
           )}
           {ruleCheckIssues && !preview && (
             <p className="mb-2 text-sm text-amber-800" role="status">
@@ -754,12 +845,14 @@ export default function Home() {
                 <textarea
                   ref={scriptEditorRef}
                   value={text}
-                  disabled={isTransposing}
+                  disabled={isTransposing || isSavingEdits}
                   onChange={(event) => {
                     setText(event.target.value);
                     setTransposeMessage("");
                     setTransposeError("");
                     setRuleCheckIssues(null);
+                    setSaveEditsError("");
+                    setSaveEditsMessage("");
                   }}
                   onScroll={handleScriptEditorScroll}
                   wrap="off"

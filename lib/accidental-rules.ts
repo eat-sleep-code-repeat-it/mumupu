@@ -168,10 +168,20 @@ function structureIssues(script: string): ScriptRuleIssue[] {
           continue;
         }
 
-        const opening = bracketStack.at(-1);
-        if (opening && openingBrackets[opening.bracket] === char) {
-          bracketStack.pop();
+        const openingBracket = Object.entries(openingBrackets)
+          .find(([, closingBracket]) => closingBracket === char)?.[0];
+        let matchingOpeningIndex = -1;
+        for (let stackIndex = bracketStack.length - 1; stackIndex >= 0; stackIndex -= 1) {
+          if (bracketStack[stackIndex].bracket === openingBracket) {
+            matchingOpeningIndex = stackIndex;
+            break;
+          }
+        }
+
+        if (matchingOpeningIndex !== -1) {
+          bracketStack.splice(matchingOpeningIndex, 1);
         } else {
+          const opening = bracketStack.at(-1);
           const message = opening
             ? `Closing bracket "${char}" does not match opening bracket "${opening.bracket}" (line ${lineNumber}, column ${index + 1}).`
             : `Unmatched closing bracket "${char}" (line ${lineNumber}, column ${index + 1}).`;

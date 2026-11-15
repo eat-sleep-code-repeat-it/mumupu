@@ -65,10 +65,22 @@ assert.deepEqual(
   "unpaired closing brackets, quotes, and opening brackets should all be reported",
 );
 
-assert.deepEqual(
-  checkScriptRules("Q:|([)]|").filter(({ kind }) => kind === "bracket").map(({ text }) => text),
-  ["(", ")"],
-  "crossed bracket pairs should be reported at the mismatched close and remaining open",
+assert.equal(
+  checkScriptRules('Q:|["B" 3, - - (4#, |:] 7,) 7,&dy1#&dy1#&dy |').length,
+  0,
+  "square brackets may pair across a barline even when crossing a parenthesis pair",
+);
+
+assert.equal(
+  checkScriptRules("Q:|[1|\nQ:2]|").length,
+  0,
+  "square brackets may pair across script lines",
+);
+
+assert.equal(
+  checkScriptRules("Q:|([)]|").length,
+  0,
+  "bracket pairs are matched by type rather than requiring nesting across types",
 );
 
 console.log("Verified script rule checks.");

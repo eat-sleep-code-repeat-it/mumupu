@@ -4,6 +4,9 @@ import path from "node:path";
 
 import { PUT } from "../app/api/songs/save/route.ts";
 
+const originalNodeEnv = process.env.NODE_ENV;
+process.env.NODE_ENV = "development";
+
 const publicDirectory = path.resolve("public");
 const temporaryDirectory = await mkdtemp(path.join(publicDirectory, ".viewer-save-test-"));
 
@@ -27,6 +30,30 @@ try {
   assert.equal(response.status, 200);
   assert.equal((await readFile(fixturePath, "utf8")), updatedContent);
 
+  process.env.NODE_ENV = "production";
+  const productionRequest = await PUT(new Request("http://localhost/api/songs/save", {
+    method: "PUT",
+    headers: {
+      "content-type": "application/json",
+      origin: "http://localhost",
+    },
+    body: JSON.stringify({ path: relativePath, content: originalContent }),
+  }));
+  assert.equal(productionRequest.status, 403);
+  assert.equal((await readFile(fixturePath, "utf8")), updatedContent);
+
+  process.env.NODE_ENV = "development";
+  const nonLocalRequest = await PUT(new Request("http://192.168.1.20/api/songs/save", {
+    method: "PUT",
+    headers: {
+      "content-type": "application/json",
+      origin: "http://192.168.1.20",
+    },
+    body: JSON.stringify({ path: relativePath, content: originalContent }),
+  }));
+  assert.equal(nonLocalRequest.status, 403);
+  assert.equal((await readFile(fixturePath, "utf8")), updatedContent);
+
   const forbiddenOrigin = await PUT(new Request("http://localhost/api/songs/save", {
     method: "PUT",
     headers: {
@@ -48,7 +75,12 @@ try {
   }));
   assert.equal(traversal.status, 400);
 
-  console.log("Verified selected JPS file saves and rejects cross-origin and traversal requests.");
+  console.log("Verified local development saves and rejects production, remote-host, cross-origin, and traversal requests.");
 } finally {
   await rm(temporaryDirectory, { recursive: true, force: true });
+  if (originalNodeEnv === undefined) {
+    delete process.env.NODE_ENV;
+  } else {
+    process.env.NODE_ENV = originalNodeEnv;
+  }
 }

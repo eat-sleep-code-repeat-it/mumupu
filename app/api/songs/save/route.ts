@@ -6,7 +6,23 @@ function isWithinDirectory(directory: string, filePath: string): boolean {
   return relativePath !== "" && !relativePath.startsWith(`..${path.sep}`) && relativePath !== ".." && !path.isAbsolute(relativePath);
 }
 
+function isLocalDevelopmentRequest(request: Request): boolean {
+  if (process.env.NODE_ENV !== "development") {
+    return false;
+  }
+
+  const hostname = new URL(request.url).hostname
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "")
+    .replace(/\.$/, "");
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
 export async function PUT(request: Request) {
+  if (!isLocalDevelopmentRequest(request)) {
+    return Response.json({ error: "Saving scripts is available only in local development" }, { status: 403 });
+  }
+
   const origin = request.headers.get("origin");
   let requestOrigin: string;
   try {

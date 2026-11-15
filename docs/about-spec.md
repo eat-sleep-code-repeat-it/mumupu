@@ -57,9 +57,11 @@ Accidentals apply to later occurrences of the same numbered pitch in the same oc
 
 ## Accidental checking and transposition
 
-In the viewer's Script panel, **Check rules** highlights an unmarked occurrence of a pitch that follows a sharp or flat on that pitch in the same measure. This is a potential missing natural, not a definitive error: an unmarked note inherits the active accidental and may be intended to remain sharp or flat. Add `=` when the note should be natural. The check also highlights unmatched `()`, `[]`, or `{}` brackets and unpaired double quotes; delimiters inside quoted text and comment lines are ignored.
+In the viewer's Script panel, **Check rules** highlights an unmarked occurrence of a pitch that follows a sharp or flat on that pitch in the same measure. This is a potential missing natural, not a definitive error: an unmarked note inherits the active accidental and may be intended to remain sharp or flat. Add `=` when the note should be natural. The check also highlights unmatched `()`, `[]`, or `{}` bracket pairs and unpaired double quotes. Brackets are paired by type and may cross barlines and script lines; delimiters inside quoted text and comment lines are ignored.
 
 Semitone transposition honors active accidentals through each measure. Its output repeats sharp or flat signs explicitly and writes `=` when a natural note must cancel an accidental already active on that pitch.
+
+In the viewer's Script panel, **Save edits** asks for confirmation before overwriting the selected `.jps` file. Saving is available only in local development on `localhost` or a loopback address; it is unavailable in production.
 
 ## Lyrics
 
