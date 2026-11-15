@@ -5,6 +5,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -211,7 +212,6 @@ export default function Home() {
   const [semitoneShift, setSemitoneShift] = useState("0");
   const [transposeError, setTransposeError] = useState("");
   const [transposeMessage, setTransposeMessage] = useState("");
-  const [ruleCheckIssues, setRuleCheckIssues] = useState<ScriptRuleIssue[] | null>(null);
   const [isSavingEdits, setIsSavingEdits] = useState(false);
   const [saveEditsError, setSaveEditsError] = useState("");
   const [saveEditsMessage, setSaveEditsMessage] = useState("");
@@ -233,6 +233,7 @@ export default function Home() {
     isLocalDevelopmentHost,
     () => false,
   );
+  const ruleCheckIssues = useMemo(() => checkScriptRules(text), [text]);
   const hasUnsavedEdits = selectedFile !== null && lastSavedText !== null && text !== lastSavedText;
 
   async function renderScore(script: string, signal?: AbortSignal): Promise<{ pages: string[]; exportSvg: string }> {
@@ -412,7 +413,6 @@ export default function Home() {
     setIsTransposing(true);
     setTransposeError("");
     setTransposeMessage("");
-    setRuleCheckIssues(null);
     setSaveEditsError("");
     setSaveEditsMessage("");
 
@@ -439,7 +439,6 @@ export default function Home() {
       }
 
       setText(data.script);
-      setRuleCheckIssues(null);
       setTransposeMessage(`Transposed script by ${adjustment} semitone${Math.abs(adjustment) === 1 ? "" : "s"}.`);
     } catch (error) {
       if (renderGeneration !== selectedFileRenderGenerationRef.current) {
@@ -463,7 +462,6 @@ export default function Home() {
     setRenderError("");
     setTransposeMessage("");
     setTransposeError("");
-    setRuleCheckIssues(null);
     setSaveEditsError("");
     setSaveEditsMessage("");
     setIsRenderingSelectedFile(true);
@@ -499,10 +497,6 @@ export default function Home() {
   function handleScript() {
     setPreview(false);
     setMode("script");
-  }
-
-  function handleCheckRules() {
-    setRuleCheckIssues(checkScriptRules(text));
   }
 
   async function handleSaveEdits() {
@@ -753,12 +747,6 @@ export default function Home() {
                     className="shrink-0 whitespace-nowrap rounded bg-gray-200 px-3 py-1 text-black hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-60">
                     {isTransposing ? "Transposing..." : "Transpose"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleCheckRules}
-                    className="shrink-0 whitespace-nowrap rounded bg-gray-200 px-3 py-1 text-black hover:bg-gray-300">
-                    Check rules
-                  </button>
                   {canSaveEdits && (
                     <button
                       type="button"
@@ -792,7 +780,7 @@ export default function Home() {
           {saveEditsMessage && !preview && (
             <p className="mb-2 text-sm text-green-700" role="status">{saveEditsMessage}</p>
           )}
-          {ruleCheckIssues && !preview && (
+          {text && !preview && (
             <p className="mb-2 text-sm text-amber-800" role="status">
               {ruleCheckIssues.length === 0
                 ? "No rule issues found."
@@ -857,7 +845,6 @@ export default function Home() {
                     setText(event.target.value);
                     setTransposeMessage("");
                     setTransposeError("");
-                    setRuleCheckIssues(null);
                     setSaveEditsError("");
                     setSaveEditsMessage("");
                   }}
