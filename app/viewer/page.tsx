@@ -833,7 +833,7 @@ export default function Home() {
                 <pre
                   ref={scriptHighlightRef}
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 m-0 overflow-hidden whitespace-pre p-4 font-mono text-base leading-6 text-white"
+                  className="pointer-events-none absolute inset-0 m-0 overflow-hidden whitespace-pre p-4 pb-16 font-mono text-base leading-6 text-white"
                 >
                   {renderHighlightedScript(text, ruleCheckIssues ?? [])}
                 </pre>
