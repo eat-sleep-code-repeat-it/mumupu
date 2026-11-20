@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { DOMParser } from "@xmldom/xmldom";
 import {
   convertJpsToMusicXML,
@@ -118,6 +119,73 @@ assert.equal(tupletScore.getElementsByTagName("time-modification").length, 3);
 assert.deepEqual(
   Array.from(tupletScore.getElementsByTagName("note")).map((note) => elementText(note, "duration")),
   ["1", "1", "1"],
+);
+
+const groupedDurationScore = parseMusicXML(convertJpsToMusicXML([
+  "D: C",
+  "P: 4/4",
+  "Q: | (3)--- ||",
+].join("\n")).musicXml);
+assert.equal(elementText(groupedDurationScore.getElementsByTagName("note")[0], "duration"), "4");
+
+const indianMerchantScript = await readFile(
+  new URL("../public/100首练习/0001-印度客商之歌.jps", import.meta.url),
+  "utf8",
+);
+const indianMerchantScore = parseMusicXML(convertJpsToMusicXML(indianMerchantScript).musicXml);
+assert.ok(indianMerchantScore.getElementsByTagName("p").length > 0);
+assert.ok(indianMerchantScore.getElementsByTagName("mp").length > 0);
+assert.ok(indianMerchantScore.getElementsByTagName("pp").length > 0);
+assert.ok(indianMerchantScore.getElementsByTagName("wedge").length > 0);
+assert.ok(indianMerchantScore.getElementsByTagName("fermata").length > 0);
+assert.deepEqual(
+  Array.from(indianMerchantScore.getElementsByTagName("rehearsal"))
+    .map((rehearsal) => rehearsal.textContent),
+  ["A", "B"],
+);
+assert.ok(
+  Array.from(indianMerchantScore.getElementsByTagName("measure"))
+    .slice(12)
+    .every((measure) => measure.getElementsByTagName("note").length > 0),
+);
+assert.ok(
+  Array.from(indianMerchantScore.getElementsByTagName("words"))
+    .some((words) => words.textContent === "rit."),
+);
+
+const halfMountainRainScript = await readFile(
+  new URL("../public/100首练习/0010-半山听雨.jps", import.meta.url),
+  "utf8",
+);
+const halfMountainRainScore = parseMusicXML(convertJpsToMusicXML(halfMountainRainScript).musicXml);
+const firstHalfMountainMeasure = halfMountainRainScore.getElementsByTagName("measure")[0];
+const firstHalfMountainAttributes = firstHalfMountainMeasure.getElementsByTagName("attributes")[0];
+assert.ok(firstHalfMountainAttributes);
+assert.ok(
+  Array.from(firstHalfMountainAttributes.childNodes)
+    .some((child) => child.nodeName === "divisions"),
+);
+assert.ok(
+  Array.from(firstHalfMountainAttributes.childNodes)
+    .some((child) => child.nodeName === "key"),
+);
+assert.ok(
+  Array.from(firstHalfMountainAttributes.childNodes)
+    .some((child) => child.nodeName === "time"),
+);
+assert.ok(halfMountainRainScore.getElementsByTagName("pitch").length > 0);
+assert.ok(halfMountainRainScore.getElementsByTagName("grace").length > 0);
+assert.ok(
+  Array.from(halfMountainRainScore.getElementsByTagName("bracket"))
+    .some((bracket) => bracket.getAttribute("type") === "start"),
+);
+assert.ok(
+  Array.from(halfMountainRainScore.getElementsByTagName("bracket"))
+    .some((bracket) => bracket.getAttribute("type") === "stop"),
+);
+assert.ok(
+  Array.from(halfMountainRainScore.getElementsByTagName("bracket"))
+    .every((bracket) => bracket.parentNode?.nodeName === "direction-type"),
 );
 
 assert.throws(

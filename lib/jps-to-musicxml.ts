@@ -17,6 +17,13 @@ type Fraction = {
   denominator: number;
 };
 
+type GraceNote = {
+  step: string;
+  octave: number;
+  accidental: number;
+  slash: boolean;
+};
+
 type NoteEvent = {
   rest: boolean;
   hidden: boolean;
@@ -34,6 +41,11 @@ type NoteEvent = {
   tremolo: number;
   annotation: string | null;
   slideUp: boolean | null;
+  directionsBefore: string[];
+  directionsAfter: string[];
+  fermata: boolean;
+  trill: boolean;
+  graceNotes: GraceNote[];
 };
 
 type Barline = "regular" | "double" | "final" | "repeat";
@@ -58,6 +70,8 @@ type KeyInfo = {
   semitoneOffset: number;
   diatonicOffset: number;
 };
+
+type PitchEvent = Pick<NoteEvent, "rest" | "step" | "octave" | "accidental">;
 
 type OpenGroup = {
   events: NoteEvent[];
@@ -85,6 +99,12 @@ const STEP_BY_DEGREE: Record<string, string> = {
 };
 const SHARP_ORDER = ["F", "C", "G", "D", "A", "E", "B"];
 const FLAT_ORDER = ["B", "E", "A", "D", "G", "C", "F"];
+const MUSICXML_DYNAMIC_MARKS = new Set([
+  "p", "pp", "ppp", "pppp", "ppppp", "pppppp",
+  "mp", "mf", "f", "ff", "fff", "ffff", "fffff", "ffffff",
+  "sf", "sfp", "sfpp", "fp", "rf", "rfz", "sfz", "sffz", "fz",
+  "rit",
+]);
 const KEY_SETTINGS: Record<string, { fifths: number; semitoneOffset: number }> = {
   C: { fifths: 0, semitoneOffset: 0 },
   G: { fifths: 1, semitoneOffset: -5 },
@@ -123,6 +143,24 @@ function scaleDuration(duration: Fraction, numerator: number, denominator: numbe
     duration.numerator * numerator,
     duration.denominator * denominator,
   );
+}
+
+function parseGraceNote(value: string): GraceNote {
+  const match = /^([1-7])([#$=]?)([',]*)(\/+)?\.{0,2}$/.exec(value);
+  if (!match) {
+    throw new JpsToMusicXMLConversionError(`Unsupported grace note: ${value}.`);
+  }
+  const octave = Array.from(match[3]).reduce(
+    (offset, marker) => offset + (marker === "'" ? 1 : -1),
+    0,
+  );
+  const accidental = match[2] === "#" ? 1 : match[2] === "$" ? -1 : 0;
+  return {
+    step: STEP_BY_DEGREE[match[1]],
+    octave: 4 + octave,
+    accidental,
+    slash: Boolean(match[4]),
+  };
 }
 
 function parseMeter(value: string): Meter {
@@ -170,7 +208,7 @@ function keyAlteration(step: string, fifths: number): number {
   return 0;
 }
 
-function resolvePitch(event: NoteEvent, key: KeyInfo) {
+function resolvePitch(event: PitchEvent, key: KeyInfo) {
   if (event.rest || !event.step) {
     return null;
   }
@@ -204,6 +242,21 @@ function escapeXml(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll("\"", "&quot;")
     .replaceAll("'", "&apos;");
+}
+
+function dynamicDirection(symbol: string): string {
+  const directionType = symbol === "rit"
+    ? "<words>rit.</words>"
+    : `<dynamics><${symbol}/></dynamics>`;
+  return `<direction placement="below"><direction-type>${directionType}</direction-type></direction>`;
+}
+
+function wedgeDirection(type: "crescendo" | "diminuendo" | "stop", number: number): string {
+  return `<direction placement="below"><direction-type><wedge type="${type}" number="${number}"/></direction-type></direction>`;
+}
+
+function bracketDirection(type: "start" | "stop", number: number): string {
+  return `<direction placement="above"><direction-type><bracket line-end="none" type="${type}" line-type="solid" number="${number}"/></direction-type></direction>`;
 }
 
 function quotedText(source: string, start: number): { value: string; next: number } {
@@ -242,6 +295,10 @@ function parsePartBody(
   let leftRepeat = false;
   let index = 0;
   let slurNumber = 0;
+  let nextBracketNumber = 0;
+  let nextHairpinNumber = 0;
+  const activeBracketNumbers: number[] = [];
+  const activeHairpinNumbers: number[] = [];
 
   const finishMeasure = (rightBarline: Barline) => {
     if (
@@ -347,6 +404,21 @@ function parsePartBody(
       continue;
     }
 
+    if (character === "[") {
+      const event = events.at(-1);
+      const closingIndex = source.indexOf("]", index + 1);
+      if (!event || closingIndex < 0) {
+        throw new JpsToMusicXMLConversionError("A grace-note group must follow a note and have a closing bracket.");
+      }
+      const graceNotes = source.slice(index + 1, closingIndex).trim().split(/\s+/).filter(Boolean);
+      if (graceNotes.length === 0) {
+        throw new JpsToMusicXMLConversionError("A grace-note group cannot be empty.");
+      }
+      event.graceNotes.push(...graceNotes.map(parseGraceNote));
+      index = closingIndex + 1;
+      continue;
+    }
+
     if (character === "|" || character === ":") {
       if (source.startsWith("|:", index)) {
         if (events.length > 0) {
@@ -386,7 +458,11 @@ function parsePartBody(
         throw new JpsToMusicXMLConversionError("An incomplete JPS symbol was found.");
       }
       index += match[0].length;
-      if (symbol === "hs") {
+      if (MUSICXML_DYNAMIC_MARKS.has(symbol)) {
+        const direction = dynamicDirection(symbol);
+        const event = events.at(-1);
+        (event ? event.directionsBefore : directionsBefore).push(direction);
+      } else if (symbol === "hs") {
         (events.length === 0 ? directionsBefore : directionsAfter).push(
           '<direction><direction-type><segno/></direction-type><sound segno="segno"/></direction>',
         );
@@ -404,11 +480,115 @@ function parsePartBody(
           throw new JpsToMusicXMLConversionError(`The ${symbol} slide marker must follow a pitched note.`);
         }
         event.slideUp = symbol === "shy";
+      } else if (symbol === "yc" || symbol === "cy" || symbol === "tr") {
+        const event = events.at(-1);
+        if (!event) {
+          throw new JpsToMusicXMLConversionError(`The ${symbol} ornament must follow a note.`);
+        }
+        if (symbol === "tr") {
+          event.trill = true;
+        } else {
+          event.fermata = true;
+        }
+      } else if (symbol === "zkh") {
+        const event = events.at(-1);
+        if (!event) {
+          throw new JpsToMusicXMLConversionError("The zkh bracket marker must follow a note.");
+        }
+        const number = ++nextBracketNumber;
+        activeBracketNumbers.push(number);
+        event.directionsAfter.push(bracketDirection("start", number));
+      } else if (symbol === "ykh") {
+        const event = events.at(-1);
+        const number = activeBracketNumbers.pop();
+        if (!event || number === undefined) {
+          throw new JpsToMusicXMLConversionError("The ykh bracket marker must follow an opening zkh marker.");
+        }
+        event.directionsAfter.push(bracketDirection("stop", number));
       } else {
         throw new JpsToMusicXMLConversionError(
           `The JPS symbol &${symbol} is not supported for MusicXML export.`,
         );
       }
+      continue;
+    }
+
+    if (character === "-") {
+      const event = events.at(-1);
+      if (!event) {
+        throw new JpsToMusicXMLConversionError("A duration extension must follow a note.");
+      }
+      event.duration = fraction(
+        event.duration.numerator + event.duration.denominator,
+        event.duration.denominator,
+      );
+      index += 1;
+      continue;
+    }
+
+    if (character === "," || character === "'") {
+      const event = events.at(-1);
+      if (!event || event.rest) {
+        throw new JpsToMusicXMLConversionError("An octave marker must follow a pitched note.");
+      }
+      while (source[index] === "," || source[index] === "'") {
+        event.octave += source[index] === "'" ? 1 : -1;
+        index += 1;
+      }
+      continue;
+    }
+
+    if (character === "/" || character === ".") {
+      const event = events.at(-1);
+      if (!event) {
+        throw new JpsToMusicXMLConversionError("A duration marker must follow a note.");
+      }
+      let slashCount = 0;
+      let dotCount = 0;
+      while (source[index] === "/" || source[index] === ".") {
+        if (source[index] === "/") {
+          slashCount += 1;
+        } else {
+          dotCount += 1;
+        }
+        index += 1;
+      }
+      if (slashCount > 8 || dotCount > 2) {
+        throw new JpsToMusicXMLConversionError("The note duration is too small or has too many dots to export.");
+      }
+      event.duration = scaleDuration(
+        event.duration,
+        2 ** (dotCount + 1) - 1,
+        2 ** (slashCount + dotCount),
+      );
+      continue;
+    }
+
+    if (character === "<" || character === ">") {
+      let markerEnd = index;
+      while (source[markerEnd] === "<" || source[markerEnd] === ">") {
+        markerEnd += 1;
+      }
+      const event = events.at(-1);
+      if (!event) {
+        throw new JpsToMusicXMLConversionError("A hairpin marker must follow a note.");
+      }
+      const type = source.slice(index, markerEnd).includes("<") ? "crescendo" : "diminuendo";
+      const number = ++nextHairpinNumber;
+      activeHairpinNumbers.push(number);
+      event.directionsBefore.push(wedgeDirection(type, number));
+      index = markerEnd;
+      continue;
+    }
+
+    if (character === "!") {
+      const event = events.at(-1);
+      if (!event) {
+        throw new JpsToMusicXMLConversionError("A hairpin stop marker must follow a note.");
+      }
+      const number = activeHairpinNumbers.pop() ?? 1;
+      event.directionsAfter.push(wedgeDirection("stop", number));
+      index += 1;
       continue;
     }
 
@@ -492,6 +672,11 @@ function parsePartBody(
         tremolo: 0,
         annotation: null,
         slideUp: null,
+        directionsBefore: [],
+        directionsAfter: [],
+        fermata: false,
+        trill: false,
+        graceNotes: [],
       };
       addEvent(event);
       continue;
@@ -600,6 +785,20 @@ function divisionsFor(parts: ParsedPart[]): number {
 }
 
 function renderEvent(event: NoteEvent, key: KeyInfo, divisions: number): string {
+  const graceNotes = event.graceNotes.map((graceNote) => {
+    const pitch = resolvePitch({
+      rest: false,
+      step: graceNote.step,
+      octave: graceNote.octave,
+      accidental: graceNote.accidental,
+    }, key);
+    if (!pitch) {
+      throw new JpsToMusicXMLConversionError("A grace note must have a pitch.");
+    }
+    const gracePitchXml =
+      `<pitch><step>${pitch.step}</step>${pitch.alter === keyAlteration(pitch.step, key.fifths) ? "" : `<alter>${pitch.alter}</alter>`}<octave>${pitch.octave}</octave></pitch>`;
+    return `<note><grace${graceNote.slash ? ' slash="yes"' : ""}/>${gracePitchXml}<voice>1</voice></note>`;
+  }).join("");
   const pitch = resolvePitch(event, key);
   const pitchXml = pitch
     ? `<pitch><step>${pitch.step}</step>${pitch.alter === keyAlteration(pitch.step, key.fifths) ? "" : `<alter>${pitch.alter}</alter>`}<octave>${pitch.octave}</octave></pitch>`
@@ -613,26 +812,29 @@ function renderEvent(event: NoteEvent, key: KeyInfo, divisions: number): string 
     ...(event.tieStop ? ['<tie type="stop"/>'] : []),
     ...(event.tieStart ? ['<tie type="start"/>'] : []),
   ].join("");
+  const ornaments = [
+    ...(event.tremolo > 0 ? [`<tremolo type="single">${event.tremolo}</tremolo>`] : []),
+    ...(event.trill ? ["<trill-mark/>"] : []),
+  ].join("");
   const notations = [
     ...event.slurStarts.map((number) => `<slur type="start" number="${number}"/>`),
     ...event.slurStops.map((number) => `<slur type="stop" number="${number}"/>`),
     ...(event.tupletStart ? ['<tuplet type="start"/>'] : []),
     ...(event.tupletStop ? ['<tuplet type="stop"/>'] : []),
-    ...(event.tremolo > 0
-      ? [`<ornaments><tremolo type="single">${event.tremolo}</tremolo></ornaments>`]
-      : []),
+    ...(event.fermata ? ["<fermata/>"] : []),
+    ...(ornaments ? [`<ornaments>${ornaments}</ornaments>`] : []),
     ...(event.slideUp !== null
       ? [`<slide type="start" line-type="solid" default-y="${event.slideUp ? -5 : 5}"/>`]
       : []),
-    ...(event.annotation
-      ? [`<other-notation type="other">${escapeXml(event.annotation)}</other-notation>`]
-      : []),
   ].join("");
+  const annotationDirection = event.annotation
+    ? `<direction placement="above"><direction-type><rehearsal>${escapeXml(event.annotation)}</rehearsal></direction-type></direction>`
+    : "";
   const timeModification = event.tuplet
     ? "<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>"
     : "";
 
-  return `<note>${pitchXml}<duration>${duration}</duration>${ties}<voice>1</voice>${timeModification}${notations ? `<notations>${notations}</notations>` : ""}</note>`;
+  return `${annotationDirection}${graceNotes}<note>${pitchXml}<duration>${duration}</duration>${ties}<voice>1</voice>${timeModification}${notations ? `<notations>${notations}</notations>` : ""}</note>`;
 }
 
 function renderMeasure(
@@ -647,13 +849,14 @@ function renderMeasure(
   const includeTime = number === 1
     || measure.meter.beats !== initialMeter.beats
     || measure.meter.beatType !== initialMeter.beatType;
-  const attributes = [
+  const attributesContent = [
     number === 1 ? `<divisions>${divisions}</divisions>` : "",
     number === 1 ? `<key><fifths>${key.fifths}</fifths></key>` : "",
     includeTime
       ? `<time><beats>${measure.meter.beats}</beats><beat-type>${measure.meter.beatType}</beat-type></time>`
       : "",
   ].filter(Boolean).join("");
+  const attributes = attributesContent ? `<attributes>${attributesContent}</attributes>` : "";
   const direction = number !== 1
     ? ""
     : tempo
@@ -661,7 +864,9 @@ function renderMeasure(
       : tempoWords
         ? `<direction placement="above"><direction-type><words>${escapeXml(tempoWords)}</words></direction-type></direction>`
         : "";
-  const events = measure.events.map((event) => renderEvent(event, key, divisions)).join("");
+  const events = measure.events.map((event) =>
+    `${event.directionsBefore.join("")}${renderEvent(event, key, divisions)}${event.directionsAfter.join("")}`,
+  ).join("");
   const leftRepeat = measure.leftRepeat
     ? '<barline location="left"><bar-style>heavy-light</bar-style><repeat direction="forward"/></barline>'
     : "";
