@@ -266,8 +266,10 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
   );
   const [isSidebarVisible, setIsSidebarVisible] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState<number | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
+  const helpDialogRef = useRef<HTMLDialogElement | null>(null);
   const scriptEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const scriptHighlightRef = useRef<HTMLPreElement | null>(null);
   const importFileRef = useRef<HTMLInputElement | null>(null);
@@ -282,6 +284,19 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
   const ruleCheckIssues = useMemo(() => checkScriptRules(text), [text]);
   const hasUnsavedEdits = selectedFile !== null && lastSavedText !== null && text !== lastSavedText;
   const hasUnexportedCreateScript = createPage && text !== lastExportedText;
+
+  useEffect(() => {
+    const dialog = helpDialogRef.current;
+    if (!dialog) {
+      return;
+    }
+
+    if (isHelpDialogOpen && !dialog.open) {
+      dialog.showModal();
+    } else if (!isHelpDialogOpen && dialog.open) {
+      dialog.close();
+    }
+  }, [isHelpDialogOpen]);
 
   useEffect(() => {
     if (!hasUnexportedCreateScript) {
@@ -998,13 +1013,13 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
               >
                 {createPage ? "Home" : "Create"}
               </Link>
-              <Link
-                href="/help"
-                onNavigate={handleCreatePageNavigation}
+              <button
+                type="button"
+                onClick={() => setIsHelpDialogOpen(true)}
                 className={`${buttonClass(false)} whitespace-nowrap`}
               >
                 Help
-              </Link>
+              </button>
               {createPage && (
                 <>
                   <input
@@ -1223,6 +1238,30 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
             </div>
           )}
         </div>
+        <dialog
+          ref={helpDialogRef}
+          aria-label="Help"
+          onClose={() => setIsHelpDialogOpen(false)}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              event.currentTarget.close();
+            }
+          }}
+          className="h-[90vh] w-[min(96vw,1100px)] max-w-none overflow-hidden rounded-lg border-0 p-0 shadow-xl backdrop:bg-black/50"
+        >
+          <div className="flex h-full flex-col bg-white">
+            <div className="flex justify-end border-b border-gray-200 p-2">
+              <button
+                type="button"
+                onClick={() => setIsHelpDialogOpen(false)}
+                className={`${buttonClass(false)} whitespace-nowrap`}
+              >
+                Close
+              </button>
+            </div>
+            <iframe src="/help" title="Help page" className="min-h-0 flex-1 border-0" />
+          </div>
+        </dialog>
       </div>
     </main>
   );

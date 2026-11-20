@@ -185,7 +185,7 @@ export default function CircleOfFifths() {
           Major keys move clockwise by fifths; each inner key is its relative minor.
           Select a key to explore its diatonic chords.
         </p>
-        <div className="mx-auto w-full max-w-xl">
+        <div className="mx-auto w-full max-w-md p-4">
           <svg
             viewBox="0 0 520 520"
             role="group"
@@ -202,54 +202,14 @@ export default function CircleOfFifths() {
                 aria-hidden="true"
               />
             ))}
-            {showSignatures && keys.map((key, index) => {
-              const accidentals = Math.abs(key.signatureCount);
-              const isSharp = key.signatureCount > 0;
-              const positions = isSharp ? sharpStaffPositions : flatStaffPositions;
-              const [staffX, staffY] = labelPoint(211, index);
-
-              return (
-                <g
-                  key={`staff-${key.major}`}
-                  transform={`translate(${staffX} ${staffY})`}
-                  aria-hidden="true"
-                  className="pointer-events-none fill-gray-900"
-                >
-                  {[-14, -7, 0, 7, 14].map((y) => (
-                    <line key={y} x1="-31" y1={y} x2="31" y2={y} stroke="#505050" strokeWidth="0.8" />
-                  ))}
-                  <text
-                    x="-31"
-                    y="5"
-                    fontSize="37"
-                    fontFamily="serif"
-                    textAnchor="middle"
-                  >
-                    {clef === "treble" ? "𝄞" : "𝄢"}
-                  </text>
-                  {Array.from({ length: accidentals }, (_, accidentalIndex) => (
-                    <text
-                      key={accidentalIndex}
-                      x={-12 + accidentalIndex * 6.4}
-                      y={positions[accidentalIndex] + 4}
-                      fontSize={isSharp ? "13" : "17"}
-                      fontFamily="serif"
-                      textAnchor="middle"
-                    >
-                      {isSharp ? "♯" : "♭"}
-                    </text>
-                  ))}
-                </g>
-              );
-            })}
             {keys.map((key, index) => {
               const isSelected = selected.index === index && !selected.isMinor;
-              const [labelX, labelY] = labelPoint(showSignatures ? 139 : 201, index);
+              const [labelX, labelY] = labelPoint(showSignatures ? 122 : 201, index);
               return (
                 <g key={`major-${key.major}`}>
                   <path
                     d={showSignatures
-                      ? segmentPath(176, 103, index)
+                      ? segmentPath(160, 103, index)
                       : segmentPath(246, 157, index)}
                     fill={isSelected ? "#70a94f" : "#75aa52"}
                     stroke="#ffffff"
@@ -316,13 +276,53 @@ export default function CircleOfFifths() {
                 </g>
               );
             })}
+            {showSignatures && keys.map((key, index) => {
+              const accidentals = Math.abs(key.signatureCount);
+              const isSharp = key.signatureCount > 0;
+              const positions = isSharp ? sharpStaffPositions : flatStaffPositions;
+              const [staffX, staffY] = labelPoint(211, index);
+
+              return (
+                <g
+                  key={`staff-${key.major}`}
+                  transform={`translate(${staffX} ${staffY})`}
+                  aria-hidden="true"
+                  className="pointer-events-none fill-gray-900"
+                >
+                  {[-14, -7, 0, 7, 14].map((y) => (
+                    <line key={y} x1="-31" y1={y} x2="31" y2={y} stroke="#505050" strokeWidth="0.8" />
+                  ))}
+                  <text
+                    x="-27"
+                    y="5"
+                    fontSize="28"
+                    fontFamily="serif"
+                    textAnchor="middle"
+                  >
+                    {clef === "treble" ? "𝄞" : "𝄢"}
+                  </text>
+                  {Array.from({ length: accidentals }, (_, accidentalIndex) => (
+                    <text
+                      key={accidentalIndex}
+                      x={-12 + accidentalIndex * 7.5}
+                      y={positions[accidentalIndex] + 4}
+                      fontSize={isSharp ? "13" : "17"}
+                      fontFamily="serif"
+                      textAnchor="middle"
+                    >
+                      {isSharp ? "♯" : "♭"}
+                    </text>
+                  ))}
+                </g>
+              );
+            })}
             {degreeMarkers.map((marker) => {
               if (marker.keyIndex < 0) {
                 return null;
               }
               const radius = marker.isMinor
                 ? showSignatures ? 91 : 141
-                : showSignatures ? 164 : 224;
+                : showSignatures ? 146 : 224;
               const [badgeX, badgeY] = labelPoint(radius, marker.keyIndex);
 
               return (
