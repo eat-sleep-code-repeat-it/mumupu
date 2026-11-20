@@ -132,7 +132,7 @@ Important practical limits:
 
 Keep the current app structure intact:
 
-- the Preview button in [app/home/page.tsx](../app/home/page.tsx)
+- the Preview button in [app/view/workspace.tsx](../app/view/workspace.tsx)
 - the POST API in [app/api/translate/route.ts](../app/api/translate/route.ts)
 - the response contract returning SVG JSON
 

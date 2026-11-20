@@ -201,7 +201,7 @@ function FolderTree({
   });
 }
 
-export default function ScriptWorkspace({ editPage = false }: { editPage?: boolean }) {
+export default function ScriptWorkspace({ homePage = false }: { homePage?: boolean }) {
   const [text, setText] = useState("");
   const [svgs, setSvgs] = useState<string[]>([]);
   const [folders, setFolders] = useState<JpsFolder[]>([]);
@@ -220,11 +220,11 @@ export default function ScriptWorkspace({ editPage = false }: { editPage?: boole
   const [isTransposing, setIsTransposing] = useState(false);
   const [isRenderingSelectedFile, setIsRenderingSelectedFile] = useState(false);
   const [renderRevision, setRenderRevision] = useState(0);
-  const [preview, setPreview] = useState(!editPage);
+  const [preview, setPreview] = useState(!homePage);
   const [mode, setMode] = useState<"script" | "preview">(
-    editPage ? "script" : "preview",
+    homePage ? "script" : "preview",
   );
-  const [isSidebarVisible, setIsSidebarVisible] = useState(!editPage);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(!homePage);
   const [sidebarWidth, setSidebarWidth] = useState<number | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
   const scriptEditorRef = useRef<HTMLTextAreaElement | null>(null);
@@ -266,7 +266,7 @@ export default function ScriptWorkspace({ editPage = false }: { editPage?: boole
   }
 
   useEffect(() => {
-    if (editPage) {
+    if (homePage) {
       return;
     }
 
@@ -305,7 +305,7 @@ export default function ScriptWorkspace({ editPage = false }: { editPage?: boole
       });
 
     return () => controller.abort();
-  }, [editPage]);
+  }, [homePage]);
 
   useEffect(() => () => resizeCleanupRef.current?.(), []);
 
@@ -729,7 +729,7 @@ export default function ScriptWorkspace({ editPage = false }: { editPage?: boole
   return (
     <main className="flex h-screen flex-col">
       <div className="flex min-h-0 flex-1">
-        {!editPage && isSidebarVisible && (
+        {!homePage && isSidebarVisible && (
           <>
             <aside
               id="viewer-file-panel"
@@ -784,12 +784,18 @@ export default function ScriptWorkspace({ editPage = false }: { editPage?: boole
           <div className="mb-2 flex min-w-0 items-center justify-between gap-2 overflow-x-auto">
             <div className="flex shrink-0 items-center gap-2">
               <Link
-                href={editPage ? "/viewer" : "/edit"}
+                href={homePage ? "/view" : "/"}
                 className={`${buttonClass(false)} whitespace-nowrap`}
               >
-                {editPage ? "Viewer" : "Edit"}
+                {homePage ? "View" : "Home"}
               </Link>
-              {editPage && (
+              <Link
+                href="/help"
+                className={`${buttonClass(false)} whitespace-nowrap`}
+              >
+                Help
+              </Link>
+              {homePage && (
                 <>
                   <input
                     ref={importFileRef}
@@ -808,7 +814,7 @@ export default function ScriptWorkspace({ editPage = false }: { editPage?: boole
                   </button>
                 </>
               )}
-              {!editPage && (
+              {!homePage && (
                 <button
                   type="button"
                   onClick={() => setIsSidebarVisible((visible) => !visible)}
@@ -878,7 +884,7 @@ export default function ScriptWorkspace({ editPage = false }: { editPage?: boole
               </button>
             )}
           </div>
-          {editPage && fileError && (
+          {homePage && fileError && (
             <p className="mb-2 text-sm text-red-700" role="alert">{fileError}</p>
           )}
           {transposeError && (
