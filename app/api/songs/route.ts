@@ -1,9 +1,10 @@
-import { readdir } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 
 type JpsFile = {
   name: string;
   path: string;
+  lastModified: number;
 };
 
 type JpsFolder = {
@@ -15,13 +16,14 @@ type JpsFolder = {
 
 async function readJpsFolder(directoryPath: string, relativePath: string): Promise<JpsFolder | null> {
   const entries = await readdir(directoryPath, { withFileTypes: true });
-  const files = entries
+  const files = (await Promise.all(entries
     .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".jps"))
-    .map((entry) => ({
+    .map(async (entry) => ({
       name: entry.name,
       path: path.posix.join(relativePath, entry.name),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+      lastModified: (await stat(path.join(directoryPath, entry.name))).mtimeMs,
+    })))
+  ).sort((a, b) => a.name.localeCompare(b.name));
   const folders = (await Promise.all(entries
     .filter((entry) => entry.isDirectory())
     .map((entry) => readJpsFolder(

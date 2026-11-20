@@ -17,6 +17,7 @@ import { checkScriptRules, type ScriptRuleIssue } from "@/lib/accidental-rules";
 type JpsFile = {
   name: string;
   path: string;
+  lastModified: number;
 };
 
 type SaveFileHandle = {
@@ -66,6 +67,30 @@ function countFiles(folders: JpsFolder[]): number {
     (count, folder) => count + folder.files.length + countFiles(folder.folders),
     0,
   );
+}
+
+function mostRecentlyUpdatedJpsFile(folders: JpsFolder[]): JpsFile | null {
+  const files = folders.flatMap((folder) => [
+    ...folder.files,
+    ...listJpsFiles(folder.folders),
+  ]);
+  return files.sort(
+    (left, right) =>
+      right.lastModified - left.lastModified || left.path.localeCompare(right.path),
+  )[0] ?? null;
+}
+
+function listJpsFiles(folders: JpsFolder[]): JpsFile[] {
+  return folders.flatMap((folder) => [
+    ...folder.files,
+    ...listJpsFiles(folder.folders),
+  ]);
+}
+
+function folderPathsForFile(filePath: string): string[] {
+  const segments = filePath.split("/");
+  segments.pop();
+  return segments.map((_, index) => segments.slice(0, index + 1).join("/"));
 }
 
 function folderPaths(folders: JpsFolder[]): string[] {
@@ -227,7 +252,7 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
   const [mode, setMode] = useState<"script" | "preview">(
     createPage ? "script" : "preview",
   );
-  const [isSidebarVisible, setIsSidebarVisible] = useState(!createPage);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState<number | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
@@ -284,19 +309,6 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
 
     const controller = new AbortController();
 
-    fetch("/jps-files/memory-from-cats.jps")
-      .then((response) => {
-        if (!response.ok) {
-          return "";
-        }
-        return response.text();
-      })
-      .then((content) => setText(content))
-      .catch((error) => {
-        setText("");
-        console.error("Failed to load file:", error);
-      });
-
     fetch("/api/songs", { signal: controller.signal })
       .then((response) => {
         if (!response.ok) {
@@ -306,7 +318,12 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
       })
       .then((data) => {
         setFolders(data.folders);
-        setExpandedFolders(new Set());
+        const latestFile = mostRecentlyUpdatedJpsFile(data.folders);
+        if (!latestFile) {
+          throw new Error("No JPS files were found.");
+        }
+        setExpandedFolders(new Set(folderPathsForFile(latestFile.path)));
+        void handleSelectFile(latestFile);
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") {
@@ -316,7 +333,10 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
         setFileError("Could not load songs.");
       });
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      fileRequestRef.current?.abort();
+    };
   }, [createPage]);
 
   useEffect(() => () => resizeCleanupRef.current?.(), []);
@@ -929,7 +949,7 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
                     aria-controls="viewer-file-panel"
                     className={`${buttonClass(isSidebarVisible)} hidden whitespace-nowrap md:inline-flex`}
                   >
-                    {isSidebarVisible ? "Hide files" : "Show files"}
+                    Files
                   </button>
                 </>
               )}
