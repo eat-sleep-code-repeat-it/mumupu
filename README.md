@@ -18,15 +18,15 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ## Pages
 
-- `/` is the script editor and import page.
+- `/` is the score viewer.
+- `/create` is where you can create or import a script.
 - `/help` contains the key-signature reference and circle of fifths.
-- `/view` is the score viewer.
 
-The previous `/edit`, `/home`, and `/viewer` URLs redirect to their new routes.
+The previous `/edit`, `/view`, `/home`, and `/viewer` URLs redirect to their current routes.
 
 ## Import MusicXML
 
-On `/`, **Import** accepts `.jps`, `.txt`, `.musicxml`, `.xml`, and compressed `.mxl` files. MusicXML files are converted to Jianpu99 JPS and loaded into the script editor. The converter follows the project's Python converter behavior and uses staff 1.
+On `/create`, **Import** accepts `.jps`, `.txt`, `.musicxml`, `.xml`, and compressed `.mxl` files. MusicXML files are converted to Jianpu99 JPS and loaded into the script editor. The converter follows the project's Python converter behavior and uses staff 1.
 
 Run the converter checks with:
 

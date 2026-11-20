@@ -1,5 +1,5 @@
-import ScriptWorkspace from "./workspace";
+import { redirect } from "next/navigation";
 
-export default function ViewPage() {
-  return <ScriptWorkspace />;
+export default function ViewRedirect() {
+  redirect("/");
 }
