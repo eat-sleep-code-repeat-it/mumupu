@@ -1,5 +1,5 @@
-import ScriptWorkspace from "../viewer/viewer";
+import { redirect } from "next/navigation";
 
-export default function EditPage() {
-  return <ScriptWorkspace editPage />;
+export default function EditRedirect() {
+  redirect("/create");
 }

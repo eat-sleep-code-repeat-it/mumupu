@@ -1,5 +1,5 @@
-import HomePage from "./home/page";
+import ScriptWorkspace from "./view/workspace";
 
 export default function Page() {
-  return <HomePage />;
+  return <ScriptWorkspace />;
 }

@@ -201,7 +201,7 @@ function FolderTree({
   });
 }
 
-export default function ScriptWorkspace({ editPage = false }: { editPage?: boolean }) {
+export default function ScriptWorkspace({ createPage = false }: { createPage?: boolean }) {
   const [text, setText] = useState("");
   const [svgs, setSvgs] = useState<string[]>([]);
   const [folders, setFolders] = useState<JpsFolder[]>([]);
@@ -220,11 +220,11 @@ export default function ScriptWorkspace({ editPage = false }: { editPage?: boole
   const [isTransposing, setIsTransposing] = useState(false);
   const [isRenderingSelectedFile, setIsRenderingSelectedFile] = useState(false);
   const [renderRevision, setRenderRevision] = useState(0);
-  const [preview, setPreview] = useState(!editPage);
+  const [preview, setPreview] = useState(!createPage);
   const [mode, setMode] = useState<"script" | "preview">(
-    editPage ? "script" : "preview",
+    createPage ? "script" : "preview",
   );
-  const [isSidebarVisible, setIsSidebarVisible] = useState(!editPage);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(!createPage);
   const [sidebarWidth, setSidebarWidth] = useState<number | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
   const scriptEditorRef = useRef<HTMLTextAreaElement | null>(null);
@@ -266,7 +266,7 @@ export default function ScriptWorkspace({ editPage = false }: { editPage?: boole
   }
 
   useEffect(() => {
-    if (editPage) {
+    if (createPage) {
       return;
     }
 
@@ -305,7 +305,7 @@ export default function ScriptWorkspace({ editPage = false }: { editPage?: boole
       });
 
     return () => controller.abort();
-  }, [editPage]);
+  }, [createPage]);
 
   useEffect(() => () => resizeCleanupRef.current?.(), []);
 
@@ -516,6 +516,12 @@ export default function ScriptWorkspace({ editPage = false }: { editPage?: boole
     if (!file) {
       return;
     }
+    const fileName = file.name.toLowerCase();
+    const isMusicXml = /\.(musicxml|xml|mxl)$/.test(fileName);
+    if (!isMusicXml && !/\.(jps|txt)$/.test(fileName)) {
+      setFileError("Choose a .jps, .txt, .musicxml, .xml, or .mxl file.");
+      return;
+    }
     if (
       hasUnsavedEdits
       && !window.confirm("Discard your unsaved edits and import another script?")
@@ -536,7 +542,27 @@ export default function ScriptWorkspace({ editPage = false }: { editPage?: boole
     setIsRenderingSelectedFile(false);
 
     try {
-      const content = await file.text();
+      let content: string;
+      if (isMusicXml) {
+        const formData = new FormData();
+        formData.append("file", file);
+        const response = await fetch("/api/musicxml-to-jps", {
+          method: "POST",
+          body: formData,
+        });
+        const data = await response.json() as { script?: unknown; error?: unknown };
+        if (!response.ok) {
+          throw new Error(
+            typeof data.error === "string" ? data.error : `Request failed: ${response.status}`,
+          );
+        }
+        if (typeof data.script !== "string") {
+          throw new Error("MusicXML converter returned an invalid script.");
+        }
+        content = data.script;
+      } else {
+        content = await file.text();
+      }
       if (renderGeneration !== selectedFileRenderGenerationRef.current) {
         return;
       }
@@ -552,7 +578,7 @@ export default function ScriptWorkspace({ editPage = false }: { editPage?: boole
         return;
       }
       console.error("Failed to import script:", error);
-      setFileError(`Could not read ${file.name}.`);
+      setFileError(error instanceof Error ? error.message : `Could not import ${file.name}.`);
     }
   }
 
@@ -703,7 +729,7 @@ export default function ScriptWorkspace({ editPage = false }: { editPage?: boole
   return (
     <main className="flex h-screen flex-col">
       <div className="flex min-h-0 flex-1">
-        {!editPage && isSidebarVisible && (
+        {!createPage && isSidebarVisible && (
           <>
             <aside
               id="viewer-file-panel"
@@ -758,20 +784,26 @@ export default function ScriptWorkspace({ editPage = false }: { editPage?: boole
           <div className="mb-2 flex min-w-0 items-center justify-between gap-2 overflow-x-auto">
             <div className="flex shrink-0 items-center gap-2">
               <Link
-                href={editPage ? "/viewer" : "/edit"}
+                href={createPage ? "/" : "/create"}
                 className={`${buttonClass(false)} whitespace-nowrap`}
               >
-                {editPage ? "Viewer" : "Edit"}
+                {createPage ? "View" : "Create"}
               </Link>
-              {editPage && (
+              <Link
+                href="/help"
+                className={`${buttonClass(false)} whitespace-nowrap`}
+              >
+                Help
+              </Link>
+              {createPage && (
                 <>
                   <input
                     ref={importFileRef}
                     type="file"
-                    accept=".jps,.txt,text/plain"
+                    accept=".jps,.txt,.musicxml,.xml,.mxl"
                     onChange={(event) => void handleImportFileChange(event)}
                     className="hidden"
-                    aria-label="Import JPS script"
+                    aria-label="Import script or MusicXML file"
                   />
                   <button
                     type="button"
@@ -782,7 +814,7 @@ export default function ScriptWorkspace({ editPage = false }: { editPage?: boole
                   </button>
                 </>
               )}
-              {!editPage && (
+              {!createPage && (
                 <button
                   type="button"
                   onClick={() => setIsSidebarVisible((visible) => !visible)}
@@ -852,6 +884,9 @@ export default function ScriptWorkspace({ editPage = false }: { editPage?: boole
               </button>
             )}
           </div>
+          {createPage && fileError && (
+            <p className="mb-2 text-sm text-red-700" role="alert">{fileError}</p>
+          )}
           {transposeError && (
             <p className="mb-2 text-sm text-red-700" role="alert">{transposeError}</p>
           )}

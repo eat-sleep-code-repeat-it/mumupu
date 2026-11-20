@@ -1,5 +1,5 @@
-import ScriptWorkspace from "./viewer";
+import { redirect } from "next/navigation";
 
-export default function ViewerPage() {
-  return <ScriptWorkspace />;
+export default function ViewerRedirect() {
+  redirect("/");
 }

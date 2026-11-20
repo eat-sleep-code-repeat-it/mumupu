@@ -16,6 +16,24 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Pages
+
+- `/` is the score viewer.
+- `/create` is where you can create or import a script.
+- `/help` contains the key-signature reference and circle of fifths.
+
+The previous `/edit`, `/view`, `/home`, and `/viewer` URLs redirect to their current routes.
+
+## Import MusicXML
+
+On `/create`, **Import** accepts `.jps`, `.txt`, `.musicxml`, `.xml`, and compressed `.mxl` files. MusicXML files are converted to Jianpu99 JPS and loaded into the script editor. The converter follows the project's Python converter behavior and uses staff 1.
+
+Run the converter checks with:
+
+```bash
+pnpm verify:musicxml
+```
+
 ## Verify public JPS parity
 
 To verify every file in `public/jps-files/` against the external Jianpu renderer oracle and confirm live-edit propagation:

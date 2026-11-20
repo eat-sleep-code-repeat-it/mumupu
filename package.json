@@ -13,10 +13,13 @@
     "verify:save-script": "node --experimental-strip-types scripts/verify-save-script.mjs",
     "verify:svg-pages": "node --experimental-strip-types scripts/verify-svg-pages.mjs",
     "verify:translate": "node --experimental-strip-types scripts/verify-translate.mjs",
+    "verify:musicxml": "node --experimental-strip-types scripts/verify-musicxml-to-jps.mjs",
     "verify:songs": "node --experimental-strip-types scripts/verify-translate.mjs --songs",
     "parity:translate": "node --experimental-strip-types scripts/check-jianpu-parity.mjs"
   },
   "dependencies": {
+    "@xmldom/xmldom": "^0.9.12",
+    "fflate": "^0.8.3",
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4"

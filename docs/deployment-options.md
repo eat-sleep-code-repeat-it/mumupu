@@ -40,7 +40,7 @@ The standard way to put this app behind IIS is a reverse proxy.
    - Bind an SSL certificate to the IIS site if you need HTTPS; IIS terminates TLS and forwards plain HTTP to Node internally.
 
 8. **Verify**
-   - Browse to the IIS site's hostname and confirm `/`, `/home`, and `/api/*` all respond correctly through the proxy.
+   - Browse to the IIS site's hostname and confirm `/`, `/create`, `/help`, and `/api/*` all respond correctly through the proxy.
 
 ## Option B: `iisnode`
 
