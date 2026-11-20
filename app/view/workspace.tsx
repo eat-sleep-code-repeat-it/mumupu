@@ -1099,14 +1099,16 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
                       {isSavingEdits ? "Saving..." : "Save edits"}
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => void handleExportMusicXML()}
-                    disabled={text.trim().length === 0 || isExportingMusicXML}
-                    className={`${buttonClass(false)} whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60`}
-                  >
-                    {isExportingMusicXML ? "Exporting..." : "Export MusicXML"}
-                  </button>
+                  {!createPage && (
+                    <button
+                      type="button"
+                      onClick={() => void handleExportMusicXML()}
+                      disabled={text.trim().length === 0 || isExportingMusicXML}
+                      className={`${buttonClass(false)} whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60`}
+                    >
+                      {isExportingMusicXML ? "Exporting..." : "Export MusicXML"}
+                    </button>
+                  )}
                 </>
               )}
             </div>
