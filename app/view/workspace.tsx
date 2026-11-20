@@ -158,7 +158,7 @@ function FolderTree({
           type="button"
           aria-expanded={isExpanded}
           onClick={() => onToggleFolder(folder.path)}
-          className="flex w-full items-center gap-2 py-2 pr-3 text-left text-sm font-medium text-gray-800 hover:bg-gray-200"
+          className="flex min-h-11 w-full items-center gap-2 py-2 pr-3 text-left text-sm font-medium text-gray-800 hover:bg-gray-200 md:min-h-0"
           style={{ paddingLeft: 12 + depth * 14 }}
         >
           <span aria-hidden="true" className="w-3 shrink-0 text-center text-gray-500">
@@ -184,7 +184,7 @@ function FolderTree({
                 type="button"
                 title={file.name}
                 onClick={() => onSelectFile(file)}
-                className={`block w-full truncate py-2 pr-3 text-left text-sm ${
+                className={`block min-h-11 w-full truncate py-2 pr-3 text-left text-sm md:min-h-0 ${
                   selectedFile === file.path
                     ? "bg-blue-100 font-medium text-blue-900"
                     : "text-gray-700 hover:bg-gray-200"
@@ -204,6 +204,7 @@ function FolderTree({
 export default function ScriptWorkspace({ createPage = false }: { createPage?: boolean }) {
   const [text, setText] = useState("");
   const [svgs, setSvgs] = useState<string[]>([]);
+  const [renderedText, setRenderedText] = useState<string | null>(null);
   const [folders, setFolders] = useState<JpsFolder[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [fileFilter, setFileFilter] = useState("");
@@ -217,6 +218,8 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
   const [isSavingEdits, setIsSavingEdits] = useState(false);
   const [saveEditsError, setSaveEditsError] = useState("");
   const [saveEditsMessage, setSaveEditsMessage] = useState("");
+  const [isExportingMusicXML, setIsExportingMusicXML] = useState(false);
+  const [musicXMLExportError, setMusicXMLExportError] = useState("");
   const [isTransposing, setIsTransposing] = useState(false);
   const [isRenderingSelectedFile, setIsRenderingSelectedFile] = useState(false);
   const [renderRevision, setRenderRevision] = useState(0);
@@ -225,6 +228,7 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
     createPage ? "script" : "preview",
   );
   const [isSidebarVisible, setIsSidebarVisible] = useState(!createPage);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState<number | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
   const scriptEditorRef = useRef<HTMLTextAreaElement | null>(null);
@@ -329,6 +333,7 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
       renderScore(text, controller.signal)
         .then(({ pages }) => {
           setSvgs(pages);
+          setRenderedText(text);
           setRenderError("");
           if (renderGeneration === selectedFileRenderGenerationRef.current) {
             setIsRenderingSelectedFile(false);
@@ -339,6 +344,7 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
             return;
           }
           console.error("Automatic translation failed:", error);
+          setRenderedText(null);
           setRenderError("Translation failed. Check the script and try again.");
           if (renderGeneration === selectedFileRenderGenerationRef.current) {
             setIsRenderingSelectedFile(false);
@@ -356,11 +362,13 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
     try {
       const { pages } = await renderScore(text);
       setSvgs(pages);
+      setRenderedText(text);
       setRenderError("");
       setPreview(true);
       setMode("preview");
     } catch (error) {
       console.error("Translation failed:", error);
+      setRenderedText(null);
       setRenderError("Translation failed. Check the script and try again.");
       setPreview(true);
       setMode("preview");
@@ -388,6 +396,7 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
         : null;
       const { pages, exportSvg } = await renderScore(text);
       setSvgs(pages);
+      setRenderedText(text);
       const blob = new Blob([exportSvg], { type: "image/svg+xml;charset=utf-8" });
 
       if (fileHandle) {
@@ -408,6 +417,52 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
         return;
       }
       console.error("Save failed:", error);
+    }
+  }
+
+  async function handleExportMusicXML() {
+    setIsExportingMusicXML(true);
+    setMusicXMLExportError("");
+    try {
+      const response = await fetch("/api/jps-to-musicxml", {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+        },
+        body: text,
+      });
+      const data = await response.json() as {
+        musicXml?: unknown;
+        filename?: unknown;
+        error?: unknown;
+      };
+      if (!response.ok) {
+        throw new Error(
+          typeof data.error === "string" ? data.error : `Request failed: ${response.status}`,
+        );
+      }
+      if (typeof data.musicXml !== "string" || typeof data.filename !== "string") {
+        throw new Error("MusicXML converter returned an invalid response.");
+      }
+
+      const blob = new Blob([data.musicXml], {
+        type: "application/vnd.recordare.musicxml+xml;charset=utf-8",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = data.filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      console.error("MusicXML export failed:", error);
+      setMusicXMLExportError(
+        error instanceof Error ? error.message : "Could not export the JPS script.",
+      );
+    } finally {
+      setIsExportingMusicXML(false);
     }
   }
 
@@ -715,7 +770,7 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
   }
 
   const buttonClass = (active: boolean) =>
-    `rounded px-3 py-1 ${
+    `min-h-11 rounded px-3 py-2 md:min-h-0 md:py-1 ${
       active
         ? "bg-blue-600 text-white"
         : "bg-gray-200 text-black hover:bg-gray-300"
@@ -723,24 +778,46 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
   const normalizedFilter = fileFilter.trim().toLocaleLowerCase();
   const visibleFolders = filterFolders(folders, normalizedFilter);
   const visibleFileCount = countFiles(visibleFolders);
+  const canDownloadSvg =
+    text.trim().length > 0 && renderedText === text && !isRenderingSelectedFile;
   const isValidSemitoneShift =
     semitoneShift.trim() !== "" && Number.isInteger(Number(semitoneShift));
 
   return (
-    <main className="flex h-screen flex-col">
-      <div className="flex min-h-0 flex-1">
-        {!createPage && isSidebarVisible && (
+    <main className="flex h-dvh flex-col overflow-hidden">
+      <div className="relative flex min-h-0 flex-1">
+        {!createPage && (isSidebarVisible || isMobileSidebarOpen) && (
           <>
+            {isMobileSidebarOpen && (
+              <button
+                type="button"
+                aria-label="Close file list"
+                onClick={() => setIsMobileSidebarOpen(false)}
+                className="fixed inset-0 z-40 bg-black/40 md:hidden"
+              />
+            )}
             <aside
               id="viewer-file-panel"
               ref={sidebarRef}
-              className="flex w-44 shrink-0 flex-col bg-gray-50 sm:w-64"
+              aria-label="JPS files"
+              className={`flex w-[min(85vw,20rem)] max-w-[85vw] shrink-0 flex-col bg-gray-50 md:static md:max-w-none md:shadow-none ${
+                isMobileSidebarOpen
+                  ? "fixed inset-y-0 left-0 z-50 shadow-xl md:z-auto"
+                  : "hidden md:flex"
+              } ${isSidebarVisible ? "md:flex" : "md:hidden"} md:w-44 lg:w-64`}
               style={sidebarWidth === null ? undefined : { width: sidebarWidth }}
             >
               <div className="border-b border-gray-300 p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <h2 className="text-sm font-semibold text-gray-900">JPS files</h2>
                   <span className="text-xs text-gray-500">{visibleFileCount}</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileSidebarOpen(false)}
+                    className="min-h-11 rounded px-3 py-2 text-sm text-gray-900 hover:bg-gray-200 md:hidden"
+                  >
+                    Close
+                  </button>
                 </div>
                 <input
                   type="search"
@@ -748,7 +825,7 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
                   onChange={(event) => handleFileFilterChange(event.target.value)}
                   placeholder="Filter files"
                   aria-label="Filter song files"
-                  className="w-full border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 outline-none focus:border-blue-600"
+                  className="min-h-11 w-full border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 outline-none focus:border-blue-600"
                 />
                 {fileError && (
                   <p className="mt-2 text-xs text-red-700" role="alert">{fileError}</p>
@@ -760,29 +837,34 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
                   expandedFolders={expandedFolders}
                   selectedFile={selectedFile}
                   onToggleFolder={handleToggleFolder}
-                  onSelectFile={handleSelectFile}
+                  onSelectFile={(file) => {
+                    setIsMobileSidebarOpen(false);
+                    void handleSelectFile(file);
+                  }}
                 />
               </div>
             </aside>
 
-            <div
-              role="separator"
-              aria-label="Resize file list"
-              aria-orientation="vertical"
-              aria-valuemin={160}
-              aria-valuemax={480}
-              aria-valuenow={sidebarWidth ?? undefined}
-              tabIndex={0}
-              onPointerDown={handleResizeStart}
-              onKeyDown={handleResizeKeyDown}
-              className="w-1 shrink-0 cursor-col-resize touch-none border-x border-gray-300 bg-gray-100 outline-none hover:bg-blue-400 focus:bg-blue-500"
-            />
+            {isSidebarVisible && (
+              <div
+                role="separator"
+                aria-label="Resize file list"
+                aria-orientation="vertical"
+                aria-valuemin={160}
+                aria-valuemax={480}
+                aria-valuenow={sidebarWidth ?? undefined}
+                tabIndex={0}
+                onPointerDown={handleResizeStart}
+                onKeyDown={handleResizeKeyDown}
+                className="hidden w-1 shrink-0 cursor-col-resize touch-none border-x border-gray-300 bg-gray-100 outline-none hover:bg-blue-400 focus:bg-blue-500 md:block"
+              />
+            )}
           </>
         )}
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col p-4">
-          <div className="mb-2 flex min-w-0 items-center justify-between gap-2 overflow-x-auto">
-            <div className="flex shrink-0 items-center gap-2">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col p-2 sm:p-3 md:p-4">
+          <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
               <Link
                 href={createPage ? "/" : "/create"}
                 className={`${buttonClass(false)} whitespace-nowrap`}
@@ -815,26 +897,34 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
                 </>
               )}
               {!createPage && (
-                <button
-                  type="button"
-                  onClick={() => setIsSidebarVisible((visible) => !visible)}
-                  aria-expanded={isSidebarVisible}
-                  aria-controls="viewer-file-panel"
-                  className={`${buttonClass(isSidebarVisible)} whitespace-nowrap`}>
-                  {isSidebarVisible ? "Hide files" : "Show files"}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileSidebarOpen(true)}
+                    aria-expanded={isMobileSidebarOpen}
+                    aria-controls="viewer-file-panel"
+                    className={`${buttonClass(isMobileSidebarOpen)} whitespace-nowrap md:hidden`}
+                  >
+                    Files
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsSidebarVisible((visible) => !visible)}
+                    aria-expanded={isSidebarVisible}
+                    aria-controls="viewer-file-panel"
+                    className={`${buttonClass(isSidebarVisible)} hidden whitespace-nowrap md:inline-flex`}
+                  >
+                    {isSidebarVisible ? "Hide files" : "Show files"}
+                  </button>
+                </>
               )}
               <button
                 type="button"
-                onClick={handleScript}
-                className={`${buttonClass(mode === "script")} whitespace-nowrap`}>
-                Script
-              </button>
-              <button
-                type="button"
-                onClick={handlePreview}
-                className={`${buttonClass(mode === "preview")} whitespace-nowrap`}>
-                Preview
+                onClick={mode === "preview" ? handleScript : handlePreview}
+                aria-label={mode === "preview" ? "Switch to script" : "Switch to preview"}
+                className={`${buttonClass(false)} whitespace-nowrap`}
+              >
+                {mode === "preview" ? "Script" : "Preview"}
               </button>
               {!preview && (
                 <>
@@ -853,14 +943,14 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
                           void handleTranspose();
                         }
                       }}
-                      className="w-20 rounded border border-gray-300 px-2 py-1"
+                      className="min-h-11 w-20 rounded border border-gray-300 px-2 py-1 md:min-h-0"
                     />
                   </label>
                   <button
                     type="button"
                     onClick={() => void handleTranspose()}
                     disabled={!isValidSemitoneShift || isTransposing || isSavingEdits}
-                    className="shrink-0 whitespace-nowrap rounded bg-gray-200 px-3 py-1 text-black hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-60">
+                    className="min-h-11 shrink-0 whitespace-nowrap rounded bg-gray-200 px-3 py-2 text-black hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-60 md:min-h-0 md:py-1">
                     {isTransposing ? "Transposing..." : "Transpose"}
                   </button>
                   {canSaveEdits && (
@@ -868,10 +958,18 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
                       type="button"
                       onClick={() => void handleSaveEdits()}
                       disabled={!selectedFile || !hasUnsavedEdits || isRenderingSelectedFile || isSavingEdits}
-                      className="shrink-0 whitespace-nowrap rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
+                      className="min-h-11 shrink-0 whitespace-nowrap rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 md:min-h-0 md:py-1">
                       {isSavingEdits ? "Saving..." : "Save edits"}
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => void handleExportMusicXML()}
+                    disabled={text.trim().length === 0 || isExportingMusicXML}
+                    className={`${buttonClass(false)} whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60`}
+                  >
+                    {isExportingMusicXML ? "Exporting..." : "Export MusicXML"}
+                  </button>
                 </>
               )}
             </div>
@@ -879,13 +977,18 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
               <button
                 type="button"
                 onClick={handleSave}
-                className="shrink-0 whitespace-nowrap rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700">
-                Save SVG
+                disabled={!canDownloadSvg}
+                className="min-h-11 shrink-0 whitespace-nowrap rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 md:min-h-0 md:py-1"
+              >
+                Download SVG
               </button>
             )}
           </div>
           {createPage && fileError && (
             <p className="mb-2 text-sm text-red-700" role="alert">{fileError}</p>
+          )}
+          {musicXMLExportError && (
+            <p className="mb-2 text-sm text-red-700" role="alert">{musicXMLExportError}</p>
           )}
           {transposeError && (
             <p className="mb-2 text-sm text-red-700" role="alert">{transposeError}</p>
@@ -962,6 +1065,7 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
                   disabled={isTransposing || isSavingEdits}
                   onChange={(event) => {
                     setText(event.target.value);
+                    setMusicXMLExportError("");
                     setTransposeMessage("");
                     setTransposeError("");
                     setSaveEditsError("");

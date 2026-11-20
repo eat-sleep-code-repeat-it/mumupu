@@ -14,6 +14,7 @@
     "verify:svg-pages": "node --experimental-strip-types scripts/verify-svg-pages.mjs",
     "verify:translate": "node --experimental-strip-types scripts/verify-translate.mjs",
     "verify:musicxml": "node --experimental-strip-types scripts/verify-musicxml-to-jps.mjs",
+    "verify:jps-to-musicxml": "node --experimental-strip-types scripts/verify-jps-to-musicxml.mjs",
     "verify:songs": "node --experimental-strip-types scripts/verify-translate.mjs --songs",
     "parity:translate": "node --experimental-strip-types scripts/check-jianpu-parity.mjs"
   },

@@ -28,6 +28,8 @@ The previous `/edit`, `/view`, `/home`, and `/viewer` URLs redirect to their cur
 
 On `/create`, **Import** accepts `.jps`, `.txt`, `.musicxml`, `.xml`, and compressed `.mxl` files. MusicXML files are converted to Jianpu99 JPS and loaded into the script editor. The converter follows the project's Python converter behavior and uses staff 1.
 
+In Script view, **Export MusicXML** downloads a `.musicxml` score. It exports notes, rests, durations, key and time signatures, tempo, barlines, ties, slurs, and 3:2 tuplets. Unsupported JPS notation and lyrics are reported instead of silently discarded.
+
 Run the converter checks with:
 
 ```bash
