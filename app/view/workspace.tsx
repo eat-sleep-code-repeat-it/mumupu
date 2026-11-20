@@ -114,6 +114,15 @@ function isLocalDevelopmentHost(): boolean {
   return process.env.NODE_ENV === "development" && isLocalHostname(window.location.hostname);
 }
 
+function scriptFilename(script: string): string {
+  const title = script.match(/^B:\s*(.+)$/m)?.[1]?.trim() || "score";
+  const safeTitle = title
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
+    .replace(/[. ]+$/g, "")
+    .trim();
+  return `${safeTitle || "score"}.jps`;
+}
+
 function renderHighlightedScript(text: string, issues: ScriptRuleIssue[]): ReactNode {
   if (issues.length === 0) {
     return text;
@@ -235,6 +244,7 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
   const [fileFilter, setFileFilter] = useState("");
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [lastSavedText, setLastSavedText] = useState<string | null>(null);
+  const [lastExportedText, setLastExportedText] = useState("");
   const [fileError, setFileError] = useState("");
   const [renderError, setRenderError] = useState("");
   const [semitoneShift, setSemitoneShift] = useState("0");
@@ -243,6 +253,8 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
   const [isSavingEdits, setIsSavingEdits] = useState(false);
   const [saveEditsError, setSaveEditsError] = useState("");
   const [saveEditsMessage, setSaveEditsMessage] = useState("");
+  const [isSavingCreateScript, setIsSavingCreateScript] = useState(false);
+  const [createSaveError, setCreateSaveError] = useState("");
   const [isExportingMusicXML, setIsExportingMusicXML] = useState(false);
   const [musicXMLExportError, setMusicXMLExportError] = useState("");
   const [isTransposing, setIsTransposing] = useState(false);
@@ -269,6 +281,30 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
   );
   const ruleCheckIssues = useMemo(() => checkScriptRules(text), [text]);
   const hasUnsavedEdits = selectedFile !== null && lastSavedText !== null && text !== lastSavedText;
+  const hasUnexportedCreateScript = createPage && text !== lastExportedText;
+
+  useEffect(() => {
+    if (!hasUnexportedCreateScript) {
+      return;
+    }
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnexportedCreateScript]);
+
+  function handleCreatePageNavigation(event: { preventDefault: () => void }) {
+    if (
+      hasUnexportedCreateScript
+      && !window.confirm("Your script has changes that have not been saved or exported. Leave this page and discard them?")
+    ) {
+      event.preventDefault();
+    }
+  }
 
   async function renderScore(script: string, signal?: AbortSignal): Promise<{ pages: string[]; exportSvg: string }> {
     const response = await fetch("/api/jianpu", {
@@ -438,6 +474,7 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
         const writable = await fileHandle.createWritable();
         await writable.write(blob);
         await writable.close();
+        setLastExportedText(text);
         return;
       }
 
@@ -447,11 +484,63 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
       link.download = filename;
       link.click();
       URL.revokeObjectURL(url);
+      setLastExportedText(text);
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
       console.error("Save failed:", error);
+    }
+  }
+
+  async function handleSaveCreateScript() {
+    if (!text.trim() || isSavingCreateScript) {
+      return;
+    }
+
+    setIsSavingCreateScript(true);
+    setCreateSaveError("");
+
+    try {
+      const showSaveFilePicker = (
+        window as Window & { showSaveFilePicker?: SaveFilePicker }
+      ).showSaveFilePicker;
+      const filename = scriptFilename(text);
+
+      if (showSaveFilePicker) {
+        const fileHandle = await showSaveFilePicker({
+          suggestedName: filename,
+          types: [
+            {
+              description: "JPS script",
+              accept: { "text/plain": [".jps"] },
+            },
+          ],
+        });
+        const writable = await fileHandle.createWritable();
+        await writable.write(new Blob([text], { type: "text/plain;charset=utf-8" }));
+        await writable.close();
+      } else {
+        const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      setLastExportedText(text);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      console.error("Save JPS script failed:", error);
+      setCreateSaveError(error instanceof Error ? error.message : "Could not save the JPS script.");
+    } finally {
+      setIsSavingCreateScript(false);
     }
   }
 
@@ -491,6 +580,7 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
       link.click();
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setLastExportedText(text);
     } catch (error) {
       console.error("MusicXML export failed:", error);
       setMusicXMLExportError(
@@ -613,8 +703,8 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
       return;
     }
     if (
-      hasUnsavedEdits
-      && !window.confirm("Discard your unsaved edits and import another script?")
+      (hasUnsavedEdits || hasUnexportedCreateScript)
+      && !window.confirm("Discard your unsaved script and import another?")
     ) {
       return;
     }
@@ -629,6 +719,7 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
     setTransposeMessage("");
     setSaveEditsError("");
     setSaveEditsMessage("");
+    setCreateSaveError("");
     setIsRenderingSelectedFile(false);
 
     try {
@@ -902,12 +993,14 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
               <Link
                 href={createPage ? "/" : "/create"}
+                onNavigate={handleCreatePageNavigation}
                 className={`${buttonClass(false)} whitespace-nowrap`}
               >
-                {createPage ? "View" : "Create"}
+                {createPage ? "Home" : "Create"}
               </Link>
               <Link
                 href="/help"
+                onNavigate={handleCreatePageNavigation}
                 className={`${buttonClass(false)} whitespace-nowrap`}
               >
                 Help
@@ -920,14 +1013,14 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
                     accept=".jps,.txt,.musicxml,.xml,.mxl"
                     onChange={(event) => void handleImportFileChange(event)}
                     className="hidden"
-                    aria-label="Import script or MusicXML file"
+                    aria-label="Open script or MusicXML file"
                   />
                   <button
                     type="button"
                     onClick={() => importFileRef.current?.click()}
                     className={`${buttonClass(false)} whitespace-nowrap`}
                   >
-                    Import
+                    Open
                   </button>
                 </>
               )}
@@ -988,7 +1081,16 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
                     className="min-h-11 shrink-0 whitespace-nowrap rounded bg-gray-200 px-3 py-2 text-black hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-60 md:min-h-0 md:py-1">
                     {isTransposing ? "Transposing..." : "Transpose"}
                   </button>
-                  {canSaveEdits && (
+                  {createPage && (
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveCreateScript()}
+                      disabled={!text.trim() || isSavingCreateScript}
+                      className="min-h-11 shrink-0 whitespace-nowrap rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 md:min-h-0 md:py-1">
+                      {isSavingCreateScript ? "Saving..." : "Save"}
+                    </button>
+                  )}
+                  {!createPage && canSaveEdits && (
                     <button
                       type="button"
                       onClick={() => void handleSaveEdits()}
@@ -1021,6 +1123,9 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
           </div>
           {createPage && fileError && (
             <p className="mb-2 text-sm text-red-700" role="alert">{fileError}</p>
+          )}
+          {createPage && createSaveError && (
+            <p className="mb-2 text-sm text-red-700" role="alert">{createSaveError}</p>
           )}
           {musicXMLExportError && (
             <p className="mb-2 text-sm text-red-700" role="alert">{musicXMLExportError}</p>
@@ -1100,6 +1205,7 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
                   disabled={isTransposing || isSavingEdits}
                   onChange={(event) => {
                     setText(event.target.value);
+                    setCreateSaveError("");
                     setMusicXMLExportError("");
                     setTransposeMessage("");
                     setTransposeError("");
