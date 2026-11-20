@@ -256,7 +256,10 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
     });
 
     if (!response.ok) {
-      throw new Error(`Request failed: ${response.status}`);
+      const data = await response.json() as { error?: unknown };
+      throw new Error(
+        typeof data.error === "string" ? data.error : `Renderer request failed: ${response.status}`,
+      );
     }
 
     const data = await response.json() as { pages?: unknown; exportSvg?: unknown };
@@ -267,6 +270,11 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
       throw new Error("Renderer returned an invalid SVG export");
     }
     return { pages: data.pages, exportSvg: data.exportSvg };
+  }
+
+  function getPreviewErrorMessage(error: unknown): string {
+    const reason = error instanceof Error ? error.message : "Unknown rendering error.";
+    return `Could not render preview: ${reason}`;
   }
 
   useEffect(() => {
@@ -343,9 +351,9 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
           if (error instanceof DOMException && error.name === "AbortError") {
             return;
           }
-          console.error("Automatic translation failed:", error);
+          console.error("Automatic score preview failed:", error);
           setRenderedText(null);
-          setRenderError("Translation failed. Check the script and try again.");
+          setRenderError(getPreviewErrorMessage(error));
           if (renderGeneration === selectedFileRenderGenerationRef.current) {
             setIsRenderingSelectedFile(false);
           }
@@ -359,6 +367,13 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
   }, [text, renderRevision]);
 
   async function handlePreview() {
+    if (renderedText === text && svgs.length > 0) {
+      setRenderError("");
+      setPreview(true);
+      setMode("preview");
+      return;
+    }
+
     try {
       const { pages } = await renderScore(text);
       setSvgs(pages);
@@ -367,9 +382,9 @@ export default function ScriptWorkspace({ createPage = false }: { createPage?: b
       setPreview(true);
       setMode("preview");
     } catch (error) {
-      console.error("Translation failed:", error);
+      console.error("Score preview failed:", error);
       setRenderedText(null);
-      setRenderError("Translation failed. Check the script and try again.");
+      setRenderError(getPreviewErrorMessage(error));
       setPreview(true);
       setMode("preview");
     }
